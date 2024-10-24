@@ -1,5 +1,8 @@
+import time
+from typing import Optional
+
 from elasticsearch import Elasticsearch
-from langchain.agents import AgentExecutor
+from langchain.agents import AgentExecutor, tool
 from langchain.agents.format_scratchpad import format_to_openai_functions
 from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -18,11 +21,10 @@ def search(start_ts: float, end_ts: float) -> list[str]:
     return [hit["_source"]["filename"] for hit in resp["hits"]["hits"]]
 
 
-from langchain.agents import tool
-
-
 @tool
-def get_time_ranged_search_results(start_ts: float, end_ts: float) -> list[str]:
+def get_time_ranged_search_results(
+    query: str, start_ts: float, end_ts: float
+) -> list[str]:
     """
     Returns search results between two Unix timestamps.
 
@@ -39,8 +41,6 @@ def get_time_ranged_search_results(start_ts: float, end_ts: float) -> list[str]:
     """
     return search(start_ts, end_ts)
 
-
-import time
 
 SYSTEM_PROMPT = """You are a highly capable assistant designed to help with searching for files using a time range.
 Although you cannot perform time-ranged searches directly, you have access to specialized tools for this purpose.
