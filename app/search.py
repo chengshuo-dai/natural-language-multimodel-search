@@ -1,5 +1,4 @@
 import time
-from typing import Optional
 
 from elasticsearch import Elasticsearch
 from langchain.agents import AgentExecutor, tool
@@ -9,22 +8,22 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.tools.render import format_tool_to_openai_function
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain_openai import ChatOpenAI
+from sentence_transformers import SentenceTransformer
 
-es = Elasticsearch("http://localhost:9200/")
-INDEX = "nls_search"
+ES = Elasticsearch("http://localhost:9200/")
+SBERT_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
+INDEX = "nls_search_final"
 
 
-def search(start_ts: float, end_ts: float) -> list[str]:
-    resp = es.search(
+def time_ranged_search(start_ts: float, end_ts: float) -> list[str]:
+    resp = ES.search(
         index=INDEX, query={"range": {"created": {"gte": start_ts, "lte": end_ts}}}
     )
     return [hit["_source"]["filename"] for hit in resp["hits"]["hits"]]
 
 
 @tool
-def get_time_ranged_search_results(
-    query: str, start_ts: float, end_ts: float
-) -> list[str]:
+def get_time_ranged_search_results(start_ts: float, end_ts: float) -> list[str]:
     """
     Returns search results between two Unix timestamps.
 
@@ -39,7 +38,40 @@ def get_time_ranged_search_results(
     Example:
     - get_time_ranged_search_results(1609459200.0, 1640995199.0) for "files created in 2021".
     """
-    return search(start_ts, end_ts)
+    return time_ranged_search(start_ts, end_ts)
+
+
+def semantic_search(query: str) -> list[str]:
+    query_embedding = SBERT_MODEL.encode([query])[0]
+    resp = ES.search(
+        index=INDEX,
+        query={
+            "bool": {
+                "should": [
+                    {"match": {"filename": {"query": query, "fuzziness": "auto"}}},
+                    {"match": {"text": {"query": query, "fuzziness": "auto"}}},
+                ]
+            }
+        },
+        knn={
+            "field": "embedding",
+            "query_vector": query_embedding,
+            "k": 1,
+            "num_candidates": 3,
+        },
+    )
+
+    return [hit["_source"]["filename"] for hit in resp["hits"]["hits"]]
+
+
+@tool
+def get_semantic_search_results(query: str) -> list[str]:
+    """
+    Returns search results for a semantic query that does not involve time ranges.
+    Example:
+    - get_semantic_search_results("christmas hat")
+    """
+    return semantic_search(query)
 
 
 SYSTEM_PROMPT = """You are a highly capable assistant designed to help with searching for files using a time range.
