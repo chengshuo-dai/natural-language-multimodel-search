@@ -1,4 +1,5 @@
 import time
+from dataclasses import dataclass
 
 import rich
 from elasticsearch import Elasticsearch
@@ -16,6 +17,13 @@ SBERT_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
 INDEX = "nls_search_final"
 
 
+@dataclass
+class NLSResult:
+    result_type: str  # "answer" or "search"
+    files: list[str]  # list of filenames for search results or sources for answers
+    answer: str  # answer for question, empty string if result_type is "search"
+
+
 def time_ranged_search(start_ts: float, end_ts: float) -> list[str]:
     resp = ES.search(
         index=INDEX, query={"range": {"created": {"gte": start_ts, "lte": end_ts}}}
@@ -24,7 +32,7 @@ def time_ranged_search(start_ts: float, end_ts: float) -> list[str]:
 
 
 @tool
-def get_time_ranged_search_results(start_ts: float, end_ts: float) -> list[str]:
+def get_time_ranged_search_results(start_ts: float, end_ts: float) -> NLSResult:
     """
     Returns search results between two Unix timestamps.
 
@@ -39,7 +47,9 @@ def get_time_ranged_search_results(start_ts: float, end_ts: float) -> list[str]:
     Example:
     - get_time_ranged_search_results(1609459200.0, 1640995199.0) for "files created in 2021".
     """
-    return time_ranged_search(start_ts, end_ts)
+    return NLSResult(
+        result_type="search", files=time_ranged_search(start_ts, end_ts), answer=""
+    )
 
 
 def semantic_search(query: str) -> list[str]:
@@ -66,41 +76,45 @@ def semantic_search(query: str) -> list[str]:
 
 
 @tool
-def get_semantic_search_results(query: str) -> list[str]:
+def get_semantic_search_results(query: str) -> NLSResult:
     """
     Returns search results for a semantic query that does not involve time ranges.
     Example:
     - get_semantic_search_results("christmas hat")
     """
-    return semantic_search(query)
+    return NLSResult(result_type="search", files=semantic_search(query), answer="")
 
 
-def get_answers_for_question(question: str) -> str:
+def answer_question(question: str) -> str:
+    """
+    Returns answers for a question about the file contents.
+    """
     return f"QA tool not implemented yet! Question received: {question}"
 
 
 @tool
-def get_answers_for_question(question: str) -> str:
+def get_answers_for_question(question: str) -> NLSResult:
     """
     Returns answers for a question about the file contents.
     """
-    return get_answers_for_question(question)
+    return NLSResult(result_type="answer", files=[], answer=answer_question(question))
 
 
 SYSTEM_PROMPT = """You are a highly capable assistant designed to help with searching for files and answering questions about them. You have access to specialized tools for different types of queries.
 
-1. For time-ranged queries (involving dates or times):
+1. For questions about file contents:
+   Use the question answering tool to provide information from the files. This is usually indicated by a ending question mark (?) in the query.
+
+2. For time-ranged queries (involving dates or times):
    Use the time-ranged search tool. Remember that the current Unix timestamp is {current_time}.
    Avoid performing time calculations yourself; use the provided tools for accuracy.
 
-2. For semantic queries (general search without time constraints):
-   Use the semantic search tool to find relevant files based on content or keywords.
-
-3. For questions about file contents:
-   Use the question answering tool to provide information from the files.
+3. For semantic queries (general search without time constraints):
+   Use the semantic search tool to find relevant files based on content or keywords. A semantic query does not contain a question mark (?) in the end. 
+   Only use this tool if the query does not fit into any of the above categories.
 
 When responding:
-- Analyze the query to determine which tool is most appropriate.
+- Analyze the query to determine which tool is most appropriate, starting with the question answering tool, then the time-ranged search tool, and finally the semantic search tool.
 - Use the tools to obtain accurate results rather than estimating or computing manually.
 - For time-ranged searches, ensure you pass properly computed timestamps (as floats representing Unix time) to the tools.
 - If unsure about any calculation or process, use the appropriate tool to achieve the desired outcome.
@@ -110,12 +124,12 @@ Your goal is to route each query to the most suitable tool and provide accurate,
 """
 
 
-def natural_language_search(query: str, openai_api_key: str) -> list[str]:
+def natural_language_search(query: str, openai_api_key: str) -> NLSResult:
     tools = [
+        get_answers_for_question,  # to answer questions about the file contents
         # TODO: Consider combining these two tools into a single tool that can perform both time-ranged and semantic search.
         get_time_ranged_search_results,  # to perform time-ranged search
         get_semantic_search_results,  # to perform semantic search
-        get_answers_for_question,  # to answer questions about the file contents
         PythonREPLTool(),  # to execute python code, for doing math
     ]
 
@@ -153,12 +167,23 @@ def natural_language_search(query: str, openai_api_key: str) -> list[str]:
 
     result = agent_executor.invoke({"input": query})
 
-    # Filter out the search result that the LLM chose to return in the final response
-    # This helps perform file type filtering in the final response
-    search_result = result["intermediate_steps"][-1][-1]
-    ret = [r for r in search_result if r in result["output"]]
-
     # Uncomment this for debugging
-    # rich.print(ret)
+    # rich.print(result)
 
-    return ret
+    search_result = result["intermediate_steps"][-1][-1]
+
+    try:
+        if search_result.result_type == "search":
+            # Filter out the search result that the LLM chose to return in the final response
+            # This helps perform file type filtering in the final response
+            search_result.files = [
+                r for r in search_result.files if r in result["output"]
+            ]
+            return search_result
+        elif search_result.result_type == "answer":
+            return search_result
+        else:
+            raise ValueError(f"Invalid result type: {search_result.result_type}")
+    except Exception as e:
+        rich.print(e)
+        raise e
