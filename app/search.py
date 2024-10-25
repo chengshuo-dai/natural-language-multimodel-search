@@ -1,5 +1,6 @@
 import time
 
+import rich
 from elasticsearch import Elasticsearch
 from langchain.agents import AgentExecutor, tool
 from langchain.agents.format_scratchpad import format_to_openai_functions
@@ -54,7 +55,7 @@ def semantic_search(query: str) -> list[str]:
             }
         },
         knn={
-            "field": "embedding",
+            "field": "vector",
             "query_vector": query_embedding,
             "k": 1,
             "num_candidates": 3,
@@ -74,24 +75,47 @@ def get_semantic_search_results(query: str) -> list[str]:
     return semantic_search(query)
 
 
-SYSTEM_PROMPT = """You are a highly capable assistant designed to help with searching for files using a time range.
-Although you cannot perform time-ranged searches directly, you have access to specialized tools for this purpose.
+def get_answers_for_question(question: str) -> str:
+    return f"QA tool not implemented yet! Question received: {question}"
 
-If you need to calculate relative time or determine specific timestamps, remember that the current Unix timestamp is {current_time}.
-Avoid performing any calculations yourself. Instead, use the tools provided to handle any time calculations or searches.
 
-When responding, focus on using the tools to obtain accurate results rather than trying to manually compute or estimate values.
-Ensure that you only pass properly computed timestamps (as floats representing Unix time) to the tools.
+@tool
+def get_answers_for_question(question: str) -> str:
+    """
+    Returns answers for a question about the file contents.
+    """
+    return get_answers_for_question(question)
 
-If you are unsure or require assistance with any calculation, request the use of a tool to achieve the desired outcome.
 
-If you think the tool output is correct, return the result to the user as it is without any modifications.
+SYSTEM_PROMPT = """You are a highly capable assistant designed to help with searching for files and answering questions about them. You have access to specialized tools for different types of queries.
+
+1. For time-ranged queries (involving dates or times):
+   Use the time-ranged search tool. Remember that the current Unix timestamp is {current_time}.
+   Avoid performing time calculations yourself; use the provided tools for accuracy.
+
+2. For semantic queries (general search without time constraints):
+   Use the semantic search tool to find relevant files based on content or keywords.
+
+3. For questions about file contents:
+   Use the question answering tool to provide information from the files.
+
+When responding:
+- Analyze the query to determine which tool is most appropriate.
+- Use the tools to obtain accurate results rather than estimating or computing manually.
+- For time-ranged searches, ensure you pass properly computed timestamps (as floats representing Unix time) to the tools.
+- If unsure about any calculation or process, use the appropriate tool to achieve the desired outcome.
+- Return tool outputs to the user without modifications if they appear correct.
+
+Your goal is to route each query to the most suitable tool and provide accurate, helpful responses based on the tool's output.
 """
 
 
 def natural_language_search(query: str, openai_api_key: str) -> list[str]:
     tools = [
-        get_time_ranged_search_results,  # to perform the search
+        # TODO: Consider combining these two tools into a single tool that can perform both time-ranged and semantic search.
+        get_time_ranged_search_results,  # to perform time-ranged search
+        get_semantic_search_results,  # to perform semantic search
+        get_answers_for_question,  # to answer questions about the file contents
         PythonREPLTool(),  # to execute python code, for doing math
     ]
 
@@ -128,4 +152,13 @@ def natural_language_search(query: str, openai_api_key: str) -> list[str]:
     )
 
     result = agent_executor.invoke({"input": query})
-    return result["intermediate_steps"][-1][-1]
+
+    # Filter out the search result that the LLM chose to return in the final response
+    # This helps perform file type filtering in the final response
+    search_result = result["intermediate_steps"][-1][-1]
+    ret = [r for r in search_result if r in result["output"]]
+
+    # Uncomment this for debugging
+    # rich.print(ret)
+
+    return ret
