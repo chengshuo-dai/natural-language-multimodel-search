@@ -1,5 +1,16 @@
 # natural_language_search
 
+This is a simple app that allows you to search for files using natural language. It has the following features:
+- Semantic search on files by name and content
+- Time-ranged search on files by creation date: e.g., "pdfs I created in 2023", "photos I added last week"
+- Question answering about the contents of a file: e.g., "how much did i spent in SFO?"
+
+Here is a demo video:
+
+<video src="https://www.dropbox.com/s/jn2k7225lvtswap/Natural%20Language%20Search%20-%20Demo.mp4?st=6mhq4lpf&dl=0" controls></video>
+
+Link to the original Capture: https://capture.dropbox.com/vCuBkYtP40yWUXc9
+
 ## Virtual Environment
 
 Install necessary packages: 
