@@ -1,13 +1,19 @@
+import os
 import time
 from dataclasses import dataclass
 
+import numpy as np
 import rich
+from dotenv import load_dotenv
 from elasticsearch import Elasticsearch
 from langchain.agents import AgentExecutor, tool
 from langchain.agents.format_scratchpad import format_to_openai_functions
 from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
+from langchain.chains import RetrievalQA
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.tools.render import format_tool_to_openai_function
+from langchain_core.embeddings import Embeddings
+from langchain_elasticsearch import DenseVectorScriptScoreStrategy, ElasticsearchStore
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain_openai import ChatOpenAI
 from sentence_transformers import SentenceTransformer
@@ -85,11 +91,56 @@ def get_semantic_search_results(query: str) -> NLSResult:
     return NLSResult(result_type="search", files=semantic_search(query), answer="")
 
 
-def answer_question(question: str) -> str:
+class SbertEmbedding(Embeddings):
+    """
+    Embedding function for SBERT model.
+    By creating a custom Embeddings class, we can reuse the same embedding function for the QA chain.
+    Otherwise, with HuggingFaceEmbeddings(), we would have to keep two copies of the embedding model in memory.
+
+    The following methods are required by the Embeddings class but we actually only care about `embed_query` .
+    """
+
+    def embed_query(self, query: str) -> list[float]:
+        return SBERT_MODEL.encode(query).tolist()
+
+    def embed_documents(self, documents: list[str]) -> list[list[float]]:
+        return [SBERT_MODEL.encode(doc).tolist() for doc in documents]
+
+
+def answer_question(question: str) -> NLSResult:
     """
     Returns answers for a question about the file contents.
     """
-    return f"QA tool not implemented yet! Question received: {question}"
+    # Setup ElasticsearchStore
+    es_store = ElasticsearchStore(
+        es_url="http://localhost:9200",
+        index_name=INDEX,
+        embedding=SbertEmbedding(),
+        strategy=DenseVectorScriptScoreStrategy(),
+    )
+
+    # Setup llm to use
+    load_dotenv()
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    llm = ChatOpenAI(temperature=0.1, openai_api_key=openai_api_key)
+
+    # Setup QA chain
+    qa = RetrievalQA.from_chain_type(
+        chain_type="stuff",  # -> fill up
+        llm=llm,
+        retriever=es_store.as_retriever(
+            search_kwargs={"k": 1},
+        ),
+        return_source_documents=True,
+    )
+
+    # Invoke QA chain
+    resp = qa.invoke(question)
+
+    answer = resp["result"]
+    files = [doc.metadata["filename"] for doc in resp["source_documents"]]
+
+    return NLSResult(result_type="answer", files=files, answer=answer)
 
 
 @tool
@@ -97,7 +148,7 @@ def get_answers_for_question(question: str) -> NLSResult:
     """
     Returns answers for a question about the file contents.
     """
-    return NLSResult(result_type="answer", files=[], answer=answer_question(question))
+    return answer_question(question)
 
 
 SYSTEM_PROMPT = """You are a highly capable assistant designed to help with searching for files and answering questions about them. You have access to specialized tools for different types of queries.
@@ -124,7 +175,7 @@ Your goal is to route each query to the most suitable tool and provide accurate,
 """
 
 
-def natural_language_search(query: str, openai_api_key: str) -> NLSResult:
+def natural_language_search(query: str) -> NLSResult:
     tools = [
         get_answers_for_question,  # to answer questions about the file contents
         # TODO: Consider combining these two tools into a single tool that can perform both time-ranged and semantic search.
@@ -133,6 +184,8 @@ def natural_language_search(query: str, openai_api_key: str) -> NLSResult:
         PythonREPLTool(),  # to execute python code, for doing math
     ]
 
+    load_dotenv()
+    openai_api_key = os.getenv("OPENAI_API_KEY")
     llm = ChatOpenAI(temperature=0, openai_api_key=openai_api_key)
     llm_with_tools = llm.bind(
         functions=[format_tool_to_openai_function(tool) for tool in tools]
