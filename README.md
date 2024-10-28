@@ -1,8 +1,17 @@
 # natural_language_search
 
+## Virtual Environment
+
+Install necessary packages: 
+
+```bash
+pip install -r requirements.txt
+```
+
+The `requirements.txt` file is generated with `pipreqs`. If you run into any issues, you can manually install the packages in the `requirements.txt` file by following the specific package installation instructions.
+
 ## Index Setup
 Use the processor to process a folder of files and index them in Elasticsearch: `python processor/processor.py`. You only need to run this once.
-
 
 ![Processor Run Screenshot](/resources/processor_run_screenshot.png)
 
