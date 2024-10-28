@@ -22,7 +22,9 @@ async def main(message: cl.Message):
 async def time_consuming_function(user_input: str) -> None:
     # Load the environment variables
     loop = asyncio.get_running_loop()
-    results = await loop.run_in_executor(None, natural_language_search, user_input)
+    results, file_metas = await loop.run_in_executor(
+        None, natural_language_search, user_input
+    )
 
     if results.result_type == "search":
         if len(results.files) == 0:

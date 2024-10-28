@@ -24,17 +24,51 @@ INDEX = "nls_search_final"
 
 
 @dataclass
+class File:
+    filename: str
+    created: float
+    path: str
+    size: int
+    extension: str
+
+
+@dataclass
 class NLSResult:
     result_type: str  # "answer" or "search"
-    files: list[str]  # list of filenames for search results or sources for answers
+    # list of filenames for search results or sources for answers
+    # NOTE: we don't use list[File] because we want to keep the result type simple enough as the output of tools
+    # so that it's easier for LLM to parse
+    # we keep a mapping from filename to File object separately.
+    files: list[str]
     answer: str  # answer for question, empty string if result_type is "search"
+
+
+# Serve as a cache for File objects
+# Everytime we get a search result, we add the File objects to this cache.
+# For simplicity, we don't invalidate the cache.
+file_by_name: dict[str, File] = {}
 
 
 def time_ranged_search(start_ts: float, end_ts: float) -> list[str]:
     resp = ES.search(
         index=INDEX, query={"range": {"created": {"gte": start_ts, "lte": end_ts}}}
     )
-    return [hit["_source"]["filename"] for hit in resp["hits"]["hits"]]
+
+    files: list[str] = []
+    for hit in resp["hits"]["hits"]:
+        # Add to cache
+        file_by_name[hit["_source"]["filename"]] = File(
+            filename=hit["_source"]["filename"],
+            created=hit["_source"]["created"],
+            path=hit["_source"]["metadata"]["path"],
+            size=hit["_source"]["metadata"]["size"],
+            extension=hit["_source"]["metadata"]["extension"],
+        )
+
+        # Add to result
+        files.append(hit["_source"]["filename"])
+
+    return NLSResult(result_type="search", files=files, answer="")
 
 
 @tool
@@ -53,12 +87,10 @@ def get_time_ranged_search_results(start_ts: float, end_ts: float) -> NLSResult:
     Example:
     - get_time_ranged_search_results(1609459200.0, 1640995199.0) for "files created in 2021".
     """
-    return NLSResult(
-        result_type="search", files=time_ranged_search(start_ts, end_ts), answer=""
-    )
+    return time_ranged_search(start_ts, end_ts)
 
 
-def semantic_search(query: str) -> list[str]:
+def semantic_search(query: str) -> NLSResult:
     query_embedding = SBERT_MODEL.encode([query])[0]
     resp = ES.search(
         index=INDEX,
@@ -78,7 +110,21 @@ def semantic_search(query: str) -> list[str]:
         },
     )
 
-    return [hit["_source"]["filename"] for hit in resp["hits"]["hits"]]
+    files: list[str] = []
+    for hit in resp["hits"]["hits"]:
+        # Add to cache
+        file_by_name[hit["_source"]["filename"]] = File(
+            filename=hit["_source"]["filename"],
+            created=hit["_source"]["created"],
+            path=hit["_source"]["metadata"]["path"],
+            size=hit["_source"]["metadata"]["size"],
+            extension=hit["_source"]["metadata"]["extension"],
+        )
+
+        # Add to result
+        files.append(hit["_source"]["filename"])
+
+    return NLSResult(result_type="search", files=files, answer="")
 
 
 @tool
@@ -88,7 +134,7 @@ def get_semantic_search_results(query: str) -> NLSResult:
     Example:
     - get_semantic_search_results("christmas hat")
     """
-    return NLSResult(result_type="search", files=semantic_search(query), answer="")
+    return semantic_search(query)
 
 
 class SbertEmbedding(Embeddings):
@@ -129,7 +175,7 @@ def answer_question(question: str) -> NLSResult:
         chain_type="stuff",  # -> fill up
         llm=llm,
         retriever=es_store.as_retriever(
-            search_kwargs={"k": 1},
+            search_kwargs={"k": 1},  # Right now, we only keep one file as the source
         ),
         return_source_documents=True,
     )
@@ -138,7 +184,19 @@ def answer_question(question: str) -> NLSResult:
     resp = qa.invoke(question)
 
     answer = resp["result"]
-    files = [doc.metadata["filename"] for doc in resp["source_documents"]]
+    files: list[str] = []
+    for doc in resp["source_documents"]:
+        # Add to cache
+        file_by_name[doc.metadata["filename"]] = File(
+            filename=doc.metadata["filename"],
+            created=doc.metadata["created"],
+            path=doc.metadata["path"],
+            size=doc.metadata["size"],
+            extension=doc.metadata["extension"],
+        )
+
+        # Add to result
+        files.append(doc.metadata["filename"])
 
     return NLSResult(result_type="answer", files=files, answer=answer)
 
@@ -175,7 +233,11 @@ Your goal is to route each query to the most suitable tool and provide accurate,
 """
 
 
-def natural_language_search(query: str) -> NLSResult:
+def natural_language_search(query: str) -> tuple[NLSResult, dict[str, File]]:
+    """
+    Returns a tuple of (NLSResult, dict[str, File]).
+    The File dict contians the mapping from filename to File object that are relevant to the result.
+    """
     tools = [
         get_answers_for_question,  # to answer questions about the file contents
         # TODO: Consider combining these two tools into a single tool that can perform both time-ranged and semantic search.
@@ -232,11 +294,17 @@ def natural_language_search(query: str) -> NLSResult:
             search_result.files = [
                 r for r in search_result.files if r in result["output"]
             ]
-            return search_result
-        elif search_result.result_type == "answer":
-            return search_result
-        else:
+        elif search_result.result_type not in ["search", "answer"]:
+            # This should never happen
             raise ValueError(f"Invalid result type: {search_result.result_type}")
+
+        file_metas = {
+            fname: f
+            for fname, f in file_by_name.items()
+            if fname in search_result.files
+        }
+
+        return search_result, file_metas
     except Exception as e:
         rich.print(e)
         raise e
