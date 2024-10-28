@@ -209,7 +209,7 @@ def get_answers_for_question(question: str) -> NLSResult:
     return answer_question(question)
 
 
-SYSTEM_PROMPT = """You are a highly capable assistant designed to help with searching for files and answering questions about them. You have access to specialized tools for different types of queries.
+SYSTEM_PROMPT = """You are a highly capable assistant designed to help with searching for files and answering questions about them. You have access to specialized tools for different types of queries. You always have to use at least one tool.
 
 1. For questions about file contents:
    Use the question answering tool to provide information from the files. This is usually indicated by a ending question mark (?) in the query.
@@ -224,6 +224,7 @@ SYSTEM_PROMPT = """You are a highly capable assistant designed to help with sear
 
 When responding:
 - Analyze the query to determine which tool is most appropriate, starting with the question answering tool, then the time-ranged search tool, and finally the semantic search tool.
+- You have to use at least one tool.
 - Use the tools to obtain accurate results rather than estimating or computing manually.
 - For time-ranged searches, ensure you pass properly computed timestamps (as floats representing Unix time) to the tools.
 - If unsure about any calculation or process, use the appropriate tool to achieve the desired outcome.
