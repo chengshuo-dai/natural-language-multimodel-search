@@ -6,6 +6,14 @@ Use the processor to process a folder of files and index them in Elasticsearch: 
 
 ![Processor Run Screenshot](/resources/processor_run_screenshot.png)
 
+## Setup OpenAI API Key
+
+Create a `.env` file in the `app` directory with your OpenAI API key:   
+
+```
+OPENAI_API_KEY=sk-...
+```
+
 ## Launch Chainlit App  
 
 Go to the `app` directory and launch the Chainlit app: 
