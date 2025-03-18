@@ -20,7 +20,7 @@ from sentence_transformers import SentenceTransformer
 
 ES = Elasticsearch("http://localhost:9200/")
 SBERT_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
-INDEX = "nls_search_final"
+INDEX = "nls"
 
 
 @dataclass
@@ -168,7 +168,7 @@ def answer_question(question: str) -> NLSResult:
     # Setup llm to use
     load_dotenv()
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    llm = ChatOpenAI(temperature=0.1, openai_api_key=openai_api_key)
+    llm = ChatOpenAI(temperature=0.1, api_key=openai_api_key)
 
     # Setup QA chain
     qa = RetrievalQA.from_chain_type(
@@ -249,7 +249,7 @@ def natural_language_search(query: str) -> tuple[NLSResult, dict[str, File]]:
 
     load_dotenv()
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    llm = ChatOpenAI(temperature=0, openai_api_key=openai_api_key)
+    llm = ChatOpenAI(temperature=0, api_key=openai_api_key)
     llm_with_tools = llm.bind(
         functions=[format_tool_to_openai_function(tool) for tool in tools]
     )
