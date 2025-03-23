@@ -6,14 +6,13 @@ import warnings
 import pytesseract
 import rich
 import whisper
+from data.data import Document
 from elasticsearch import Elasticsearch
+from model.sbert import SBertModel
 from pdf2image import convert_from_path
 from PIL import Image
 from rich.progress import Progress
 from transformers import BlipForConditionalGeneration, BlipProcessor
-
-from data.data import Document
-from model.sbert import SBertModel
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -77,24 +76,18 @@ def process_file(file_path: str) -> bool:
     rich.print(f"[blue]Processing file: {file_path}[/blue]")
 
     # Get basic file metadata
-    file_stats = os.stat(file_path)
-    file_metadata = {
-        "filename": os.path.basename(file_path),
-        "path": file_path,
-        "created": datetime.datetime.fromtimestamp(os.path.getmtime(file_path)),
-        "size": file_stats.st_size,
-        "extension": os.path.splitext(file_path)[1].lower(),
-    }
+    filename = os.path.basename(file_path)
+    extension = os.path.splitext(file_path)[1].lower()
 
     text = ""
-    if file_metadata["extension"] in [".txt"]:
+    if extension in [".txt"]:
         # Pure text files
         with open(file_path, "r") as f:
             text = f.read()
-    elif file_metadata["extension"] in [".mp3"]:
+    elif extension in [".mp3"]:
         # Audio files
         text = WHISPER_MODEL.transcribe(file_path)["text"]
-    elif file_metadata["extension"] in [".png", ".jpg", ".jpeg"]:
+    elif extension in [".png", ".jpg", ".jpeg"]:
         # We get both the image description and the image caption, and concatenate them
         image = Image.open(file_path).convert("RGB")
 
@@ -106,7 +99,7 @@ def process_file(file_path: str) -> bool:
         # Get the image caption
         ocr_result = pytesseract.image_to_string(image)
         text = f"{description}\n{ocr_result}"
-    elif file_metadata["extension"] in [".pdf"]:
+    elif extension in [".pdf"]:
         # PDF files
         pages = convert_from_path(file_path)
         pdf_page_texts = [
@@ -114,15 +107,17 @@ def process_file(file_path: str) -> bool:
         ]
         text = "\n".join(pdf_page_texts)
     else:
-        raise ValueError(f"Unsupported file extension: {file_metadata['extension']}")
+        raise ValueError(f"Unsupported file extension: {extension}")
 
     embedding = SBertModel.get_embedding(text)
+
     doc = Document(
-        filename=file_metadata["filename"],
+        filename=filename,
         text=text,
-        created=file_metadata["created"],
-        size=file_metadata["size"],
-        extension=file_metadata["extension"],
+        extension=extension,
+        created=datetime.datetime.fromtimestamp(os.path.getmtime(file_path)),
+        size=os.path.getsize(file_path),
+        path=file_path,
         embedding=embedding,
     )
     index_file(doc)

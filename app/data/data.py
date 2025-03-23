@@ -9,17 +9,19 @@ import numpy as np
 class Document:
     filename: str
     text: str
+    extension: str
     created: datetime
     size: int
-    extension: str
+    path: str
     embedding: Optional[np.ndarray] = None
 
     def _get_metadata(self) -> dict:
         return {
             "filename": self.filename,
+            "extension": self.extension,
             "created": self.created,
             "size": self.size,
-            "extension": self.extension,
+            "path": self.path,
         }
 
     def to_index_body(self) -> dict:
@@ -31,7 +33,6 @@ class Document:
             "extension": self.extension,
             "text": self.text,
             "created": self.created,
-            "size": self.size,
             "embedding": self.embedding.tolist(),
             "metadata": self._get_metadata(),
         }
