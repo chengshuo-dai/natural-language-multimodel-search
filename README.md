@@ -92,14 +92,10 @@ This will start a ngrok tunnel on port 8000 and expose the Chainlit app to the i
 To run ngrok in the background, you can use `nohup`:
 
 ```bash
-nohup ngrok http 8000 > ngrok.log 2>&1 &
+nohup ngrok http 8000 > /dev/null 2>&1 &
 ```
 
-To check the logs:
-
-```bash
-tail -f ngrok.log
-```
+Then you need to fetch the url from the ngrok endpoint dashboard: https://dashboard.ngrok.com/endpoints
 
 To stop the ngrok tunnel, you can use `pkill`:
 
@@ -107,3 +103,4 @@ To stop the ngrok tunnel, you can use `pkill`:
 pkill ngrok
 ```
 
+Alternatively, you could use tmux to run the ngrok tunnel in the background.
