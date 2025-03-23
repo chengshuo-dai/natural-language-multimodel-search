@@ -20,7 +20,7 @@ The `requirements.txt` file is generated with `pipreqs`. This requirement file i
 ## Index Setup
 Use the processor to process a folder of files and index them in Elasticsearch: `python processor/processor.py`. You only need to run this once.
 
-![Processor Run Screenshot](/resources/processor_run_screenshot.png)
+![Processor Run Screenshot](/app/resources/processor_run_screenshot.png)
 
 ## Setup OpenAI API Key
 
@@ -88,3 +88,22 @@ ngrok http 8000
 ```
 
 This will start a ngrok tunnel on port 8000 and expose the Chainlit app to the internet. You can then access the Chainlit app at `https://<ngrok-url>`.
+
+To run ngrok in the background, you can use `nohup`:
+
+```bash
+nohup ngrok http 8000 > ngrok.log 2>&1 &
+```
+
+To check the logs:
+
+```bash
+tail -f ngrok.log
+```
+
+To stop the ngrok tunnel, you can use `pkill`:
+
+```bash
+pkill ngrok
+```
+
