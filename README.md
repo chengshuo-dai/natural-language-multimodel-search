@@ -15,7 +15,7 @@ Install necessary packages:
 pip install -r requirements.txt
 ```
 
-The `requirements.txt` file is generated with `pipreqs`. If you run into any issues, you can manually install the packages in the `requirements.txt` file by following the specific package installation instructions.
+The `requirements.txt` file is generated with `pipreqs`. This requirement file is compatible with python 3.10. If you run into any issues with other python versions, you can manually install the latest version of the packages in the `requirements.txt` file by following the specific package installation instructions.
 
 ## Index Setup
 Use the processor to process a folder of files and index them in Elasticsearch: `python processor/processor.py`. You only need to run this once.
