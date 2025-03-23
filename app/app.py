@@ -26,26 +26,26 @@ def _get_file_element(file_meta: File) -> Element:
 async def time_consuming_function(user_input: str) -> None:
     # Load the environment variables
     loop = asyncio.get_running_loop()
-    results, file_metas = await loop.run_in_executor(
+    result, file_metas = await loop.run_in_executor(
         None, natural_language_search, user_input
     )
 
-    if len(results.files) == 0 and results.result_type == "search":
+    if len(result.files) == 0 and result.result_type == "search":
         await cl.Message(content="No results found.").send()
         return
 
-    elements = [_get_file_element(file_metas[result]) for result in results.files]
+    elements = [_get_file_element(file_metas[result]) for result in result.files]
 
     # Build message content
-    if results.result_type == "search":
+    if result.result_type == "search":
         message_content = "Here are the search results:\n\n"
     else:
-        message_content = f"{results.answer}\n\nSources:\n\n"
+        message_content = f"{result.answer}\n\nSources:\n\n"
 
     # Add metadata table
     message_content += "| File | Size | Created |\n|------|------|---------|\n"
 
-    for file in results.files:
+    for file in result.files:
         file_meta = file_metas[file]
         size_mb = f"{file_meta.size / (1024 * 1024):.2f} MB"
         created_dt = datetime.datetime.fromisoformat(file_meta.created).strftime(
