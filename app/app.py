@@ -24,11 +24,7 @@ def _get_file_element(file_meta: File) -> Element:
 
 
 async def time_consuming_function(user_input: str) -> None:
-    # Load the environment variables
-    loop = asyncio.get_running_loop()
-    result, file_metas = await loop.run_in_executor(
-        None, natural_language_search, user_input
-    )
+    result, file_metas = natural_language_search(user_input)
 
     if len(result.files) == 0 and result.result_type == "search":
         await cl.Message(content="No results found.").send()
