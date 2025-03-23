@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import time
 
 import chainlit as cl
@@ -48,7 +49,9 @@ async def time_consuming_function(user_input: str) -> None:
     for file in results.files:
         file_meta = file_metas[file]
         size_mb = f"{file_meta.size / (1024 * 1024):.2f} MB"
-        created_dt = time.strftime("%Y-%m-%d %H:%M", time.localtime(file_meta.created))
+        created_dt = datetime.datetime.fromisoformat(file_meta.created).strftime(
+            "%Y-%m-%d %H:%M"
+        )
         message_content += f"| {file_meta.filename} | {size_mb} | {created_dt} |\n"
 
     await cl.Message(content=message_content, elements=elements).send()
