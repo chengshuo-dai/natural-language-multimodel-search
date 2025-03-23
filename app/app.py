@@ -60,7 +60,7 @@ async def start():
 @cl.on_message
 async def main(message: cl.Message):
     # Start a loading status indicator
-    async with cl.Step("Processing your query...") as step:
+    async with cl.Step("Processing your query..."):
         await time_consuming_function(message.content)
 
 
