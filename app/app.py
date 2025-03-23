@@ -22,37 +22,6 @@ def _get_file_element(file_meta: File) -> Element:
     return element_cls(path=file_meta.path, name=file_meta.filename, display="side")
 
 
-async def time_consuming_function(user_input: str) -> None:
-    result, file_metas, tools_used = natural_language_search(user_input)
-
-    if len(result.files) == 0 and result.result_type == "search":
-        await cl.Message(content="No results found.").send()
-        return tools_used
-
-    elements = [_get_file_element(file_metas[result]) for result in result.files]
-
-    # Build message content
-    if result.result_type == "search":
-        message_content = "Here are the search results:\n\n"
-    else:
-        message_content = f"{result.answer}\n\nSources:\n\n"
-
-    # Add metadata table
-    message_content += "| File | Size | Created |\n|------|------|---------|\n"
-
-    for file in result.files:
-        file_meta = file_metas[file]
-        size_mb = f"{file_meta.size / (1024 * 1024):.2f} MB"
-        created_dt = datetime.datetime.fromisoformat(file_meta.created).strftime(
-            "%Y-%m-%d %H:%M"
-        )
-        message_content += f"| {file_meta.filename} | {size_mb} | {created_dt} |\n"
-
-    await cl.Message(content=message_content, elements=elements).send()
-
-    return tools_used
-
-
 @cl.on_chat_start
 async def start():
     await cl.Message(content="Hello! How can I assist you today?").send()
@@ -62,9 +31,34 @@ async def start():
 async def main(message: cl.Message):
     # Start a loading status indicator
     async with cl.Step("Processing your query...") as step:
-        tools_used = await time_consuming_function(message.content)
+        # Call the search agent
+        result, file_metas, tools_used = natural_language_search(message.content)
 
-    step.output = "Tools used:\n" + "\n".join([f"- `{tool}`" for tool in tools_used])
+        if len(result.files) == 0 and result.result_type == "search":
+            await cl.Message(content="No results found.").send()
+
+        elements = [_get_file_element(file_metas[result]) for result in result.files]
+
+        # Build message content
+        if result.result_type == "search":
+            message_content = "Here are the search results:\n\n"
+        else:
+            message_content = f"{result.answer}\n\nSources:\n\n"
+
+        # Add metadata table
+        message_content += "| File | Size | Created |\n|------|------|---------|\n"
+
+        for file in result.files:
+            file_meta = file_metas[file]
+            size_mb = f"{file_meta.size / (1024 * 1024):.2f} MB"
+            created_dt = datetime.datetime.fromisoformat(file_meta.created).strftime(
+                "%Y-%m-%d %H:%M"
+            )
+            message_content += f"| {file_meta.filename} | {size_mb} | {created_dt} |\n"
+
+        await cl.Message(content=message_content, elements=elements).send()
+
+    step.output = "Tools used: " + ", ".join([f"`{tool}`" for tool in tools_used])
     await step.update()
 
 
