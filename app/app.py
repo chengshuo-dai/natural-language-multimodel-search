@@ -1,4 +1,3 @@
-import asyncio
 import datetime
 
 import chainlit as cl

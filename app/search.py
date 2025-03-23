@@ -6,11 +6,8 @@ import rich
 from dotenv import load_dotenv
 from elasticsearch import Elasticsearch
 from langchain.agents import AgentExecutor, create_openai_functions_agent, tool
-from langchain.agents.format_scratchpad import format_to_openai_functions
-from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
 from langchain.chains import RetrievalQA
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.tools.render import format_tool_to_openai_function
 from langchain_elasticsearch import ElasticsearchRetriever
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain_openai import ChatOpenAI
