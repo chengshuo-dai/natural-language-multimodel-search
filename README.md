@@ -30,7 +30,7 @@ Create a `.env` file in the `app` directory with your OpenAI API key:
 OPENAI_API_KEY=sk-...
 ```
 
-## Launch Chainlit App  
+## Launch Chainlit App (for development)
 
 Go to the `app` directory and launch the Chainlit app: 
 
@@ -39,3 +39,52 @@ cd app && chainlit run app.py -w
 ```
 
 The `-w` flag runs the app in watch mode, which allows you to edit the app and see the changes without restarting the app.
+
+
+## Launch Chainlit App (for production)
+
+Go to the `app` directory and launch the Chainlit app with `pm2`:
+
+```bash
+cd app && pm2 start "chainlit run app.py --port 8000" --name chainlit
+```
+
+This will start the Chainlit app on port 8000 and name the process `chainlit`.
+
+To stop the Chainlit app, run:
+
+```bash
+pm2 stop chainlit
+```
+
+To check the status of the Chainlit app, run:
+
+```bash
+pm2 status chainlit
+```
+
+To check the logs of the Chainlit app, run:
+
+```bash
+pm2 logs chainlit
+```
+
+This is helpful in case you run into any issues launching the app and stuck in a restart loop.
+
+## Expose Chainlit App to the internet
+
+If you do own a domain, you can expose the Chainlit app to the internet by adding a Caddyfile to the `app` directory with the following content:
+
+```
+your-domain.com {
+    reverse_proxy localhost:8000
+}
+```
+
+If you do not own a domain, you can use [ngrok](https://ngrok.com/) to expose the Chainlit app to the internet.
+
+```bash
+ngrok http 8000
+```
+
+This will start a ngrok tunnel on port 8000 and expose the Chainlit app to the internet. You can then access the Chainlit app at `https://<ngrok-url>`.
