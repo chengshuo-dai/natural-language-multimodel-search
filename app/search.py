@@ -138,29 +138,24 @@ def get_semantic_search_results(query: str) -> NLSResult:
     return NLSResult(result_type="search", files=files, answer="")
 
 
-def es_query(query: str):
-    # TODO: use KNN for QnA for now
-    query_embedding = SBertModel.get_embedding(query)
-    return {
-        "knn": {
-            "field": "embedding",
-            "query_vector": query_embedding,
-            "k": 1,
-            "num_candidates": 3,
-        },
-    }
-
-
 @tool
 def get_answers_for_question(question: str) -> NLSResult:
     """
     Returns answers for questions about file contents by analyzing the content semantically.
     """
+    # TODO: we're using KNN for QnA for now, expand this to better retrieval methods
     es_retriever = ElasticsearchRetriever.from_es_params(
         url="http://localhost:9200",
         index_name=INDEX_NAME,
         content_field="text",
-        body_func=es_query,
+        body_func=lambda query: {
+            "knn": {
+                "field": "embedding",
+                "query_vector": SBertModel.get_embedding(query),
+                "k": 1,
+                "num_candidates": 3,
+            },
+        },
     )
 
     # Setup llm to use
