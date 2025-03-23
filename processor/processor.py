@@ -1,18 +1,19 @@
+import argparse
+import datetime
 import os
-import time
 import warnings
-from typing import Callable, List
 
-import numpy as np
 import pytesseract
 import rich
 import whisper
 from elasticsearch import Elasticsearch
 from pdf2image import convert_from_path
 from PIL import Image
-from rich.progress import Progress, TaskID
-from sentence_transformers import SentenceTransformer
+from rich.progress import Progress
 from transformers import BlipForConditionalGeneration, BlipProcessor
+
+from data.data import Document
+from model.sbert import SBertModel
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -22,8 +23,6 @@ warnings.filterwarnings("ignore", category=UserWarning)
 # Expand the list to include more extensions and update the process_file function as needed.
 VALID_FILE_EXTENSIONS = [".pdf", ".mp3", ".txt", ".png", ".jpg", ".jpeg"]
 
-SBERT_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
-EMBEDDING_DIM = SBERT_MODEL.encode("random").shape[0]
 
 WHISPER_MODEL = whisper.load_model("base")
 
@@ -34,19 +33,16 @@ BLIP_MODEL = BlipForConditionalGeneration.from_pretrained(
 
 # Elasticsearch
 ES = Elasticsearch("http://localhost:9200/")
-INDEX = "nls_search_final"
-
-# To make the index compatible with LangChain's QA chain, besides indexing each field separately,
-# we also index them together as a single field called "metadata"
-# and embedding, we will use the name "vector".
+INDEX_NAME = "nls"
 INDEX_MAPPING = {
     "properties": {
         "filename": {"type": "text", "analyzer": "english"},
+        "extension": {"type": "text"},
         "text": {"type": "text", "analyzer": "english"},
-        "created": {"type": "double"},
-        "vector": {
+        "created": {"type": "date"},
+        "embedding": {
             "type": "dense_vector",
-            "dims": EMBEDDING_DIM,
+            "dims": SBertModel.get_dimension(),
             "index": True,  # required for similarity search
             "similarity": "cosine",
         },
@@ -55,12 +51,7 @@ INDEX_MAPPING = {
 }
 
 
-def get_embedding(text: str, token_limit=512) -> np.ndarray:
-    """TODO: Implement the chunking logic for text longer than the token limit."""
-    return SBERT_MODEL.encode(text)
-
-
-def get_files_in_folder(folder_path: str) -> List[str]:
+def get_files_in_folder(folder_path: str) -> list[str]:
     """
     Get a list of all files within the specified folder.
     """
@@ -71,25 +62,14 @@ def get_files_in_folder(folder_path: str) -> List[str]:
     return file_list
 
 
-def index_file(text: str, metadata: dict, embedding: np.ndarray):
-    ES.index(
-        index=INDEX,
-        body={
-            "filename": metadata["filename"],
-            "text": text,
-            "created": metadata["created"],
-            "vector": embedding,
-            "metadata": metadata,
-        },
-    )
+def index_file(doc: Document):
+    ES.index(index=INDEX_NAME, body=doc.to_index_body())
 
 
 def process_file(file_path: str) -> bool:
     """
     Process a single file. Returns True if the file was processed successfully, False otherwise.
     """
-    time.sleep(1)
-    # Your file processing logic goes here
     if not file_path.lower().endswith(tuple(VALID_FILE_EXTENSIONS)):
         rich.print(f"[yellow]Skipping file: {file_path}[/yellow]")
         return False
@@ -101,9 +81,7 @@ def process_file(file_path: str) -> bool:
     file_metadata = {
         "filename": os.path.basename(file_path),
         "path": file_path,
-        # TODO: Due to a bug on MacOS, we use the last modified time instead of the creation time.
-        # which is good enough for demo purposes.
-        "created": os.path.getmtime(file_path),
+        "created": datetime.datetime.fromtimestamp(os.path.getmtime(file_path)),
         "size": file_stats.st_size,
         "extension": os.path.splitext(file_path)[1].lower(),
     }
@@ -138,10 +116,18 @@ def process_file(file_path: str) -> bool:
     else:
         raise ValueError(f"Unsupported file extension: {file_metadata['extension']}")
 
-    embedding = get_embedding(text)
-    index_file(text, file_metadata, embedding)
+    embedding = SBertModel.get_embedding(text)
+    doc = Document(
+        filename=file_metadata["filename"],
+        text=text,
+        created=file_metadata["created"],
+        size=file_metadata["size"],
+        extension=file_metadata["extension"],
+        embedding=embedding,
+    )
+    index_file(doc)
 
-    ES.indices.refresh(index=INDEX)
+    ES.indices.refresh(index=INDEX_NAME)
 
     return True
 
@@ -167,16 +153,28 @@ def process_files(folder_path: str):
 
 
 if __name__ == "__main__":
-    folder_path = input("Please enter the folder path: ")
+    # Add a argparser to handle the command line arguments
+    parser = argparse.ArgumentParser(description="Process a folder of files.")
+    parser.add_argument(
+        "--folder_path",
+        required=True,
+        type=str,
+        help="The path to the folder to process.",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite the index if it already exists.",
+    )
+    args = parser.parse_args()
 
-    # Remove the index if it exists, always overwrite the index
-    if ES.indices.exists(index=INDEX):
-        ES.indices.delete(index=INDEX)
+    if args.overwrite:
+        rich.print("[red]Overwriting the index...[/red]")
+        if ES.indices.exists(index=INDEX_NAME):
+            ES.indices.delete(index=INDEX_NAME)
 
-    ES.indices.create(index=INDEX, mappings=INDEX_MAPPING)
+    # Create the index if it doesn't exist
+    if not ES.indices.exists(index=INDEX_NAME):
+        ES.indices.create(index=INDEX_NAME, mappings=INDEX_MAPPING)
 
-    # trim the quotes from the folder path (single quote or double quote)
-    folder_path = folder_path.strip('"')
-    folder_path = folder_path.strip("'")
-
-    process_files(folder_path)
+    process_files(args.folder_path)
