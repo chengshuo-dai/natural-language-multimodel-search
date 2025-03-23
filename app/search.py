@@ -1,6 +1,5 @@
 import datetime
 import os
-import time
 from dataclasses import dataclass
 
 import rich
@@ -246,7 +245,7 @@ def natural_language_search(query: str) -> tuple[NLSResult, dict[str, File], lis
     llm = ChatOpenAI(temperature=0, api_key=openai_api_key, model="gpt-4o")
     prompt = ChatPromptTemplate.from_messages(
         [
-            ("system", SYSTEM_PROMPT.format(current_time=int(time.time()))),
+            ("system", SYSTEM_PROMPT.format(current_time=datetime.datetime.now())),
             ("user", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ]
