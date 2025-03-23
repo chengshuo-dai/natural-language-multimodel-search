@@ -44,7 +44,7 @@ class NLSResult:
 # Serve as a cache for File objects
 # Everytime we get a search result, we add the File objects to this cache.
 # For simplicity, we don't invalidate the cache.
-file_by_name: dict[str, File] = {}
+FILE_BY_NAME: dict[str, File] = {}
 
 
 @tool
@@ -83,7 +83,7 @@ def get_time_ranged_search_results(
     files: list[str] = []
     for hit in resp["hits"]["hits"]:
         # Add to cache
-        file_by_name[hit["_source"]["filename"]] = File(
+        FILE_BY_NAME[hit["_source"]["filename"]] = File(
             filename=hit["_source"]["filename"],
             created=hit["_source"]["created"],
             path=hit["_source"]["metadata"]["path"],
@@ -124,7 +124,7 @@ def get_semantic_search_results(query: str) -> NLSResult:
     files: list[str] = []
     for hit in resp["hits"]["hits"]:
         # Add to cache
-        file_by_name[hit["_source"]["filename"]] = File(
+        FILE_BY_NAME[hit["_source"]["filename"]] = File(
             filename=hit["_source"]["filename"],
             created=hit["_source"]["created"],
             path=hit["_source"]["metadata"]["path"],
@@ -183,7 +183,7 @@ def get_answers_for_question(question: str) -> NLSResult:
     files: list[str] = []
     for doc in resp["source_documents"]:
         # Add to cache
-        file_by_name[doc.metadata["_source"]["filename"]] = File(
+        FILE_BY_NAME[doc.metadata["_source"]["filename"]] = File(
             filename=doc.metadata["_source"]["filename"],
             created=doc.metadata["_source"]["created"],
             path=doc.metadata["_source"]["metadata"]["path"],
@@ -285,7 +285,7 @@ def natural_language_search(query: str) -> tuple[NLSResult, dict[str, File]]:
 
         file_metas = {
             fname: f
-            for fname, f in file_by_name.items()
+            for fname, f in FILE_BY_NAME.items()
             if fname in search_result.files
         }
 
