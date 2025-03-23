@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-import time
 
 import chainlit as cl
 from chainlit.element import Element

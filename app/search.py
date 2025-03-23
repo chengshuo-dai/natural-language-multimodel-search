@@ -1,26 +1,24 @@
+import datetime
 import os
 import time
 from dataclasses import dataclass
 
-import numpy as np
 import rich
 from dotenv import load_dotenv
 from elasticsearch import Elasticsearch
-from langchain.agents import AgentExecutor, tool
+from langchain.agents import AgentExecutor, create_openai_functions_agent, tool
 from langchain.agents.format_scratchpad import format_to_openai_functions
 from langchain.agents.output_parsers import OpenAIFunctionsAgentOutputParser
 from langchain.chains import RetrievalQA
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.tools.render import format_tool_to_openai_function
-from langchain_core.embeddings import Embeddings
-from langchain_elasticsearch import DenseVectorScriptScoreStrategy, ElasticsearchStore
+from langchain_elasticsearch import ElasticsearchRetriever
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain_openai import ChatOpenAI
-from sentence_transformers import SentenceTransformer
+from model.sbert import SBertModel
 
 ES = Elasticsearch("http://localhost:9200/")
-SBERT_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
-INDEX = "nls"
+INDEX_NAME = "nls"
 
 
 @dataclass
@@ -49,9 +47,37 @@ class NLSResult:
 file_by_name: dict[str, File] = {}
 
 
-def time_ranged_search(start_ts: float, end_ts: float) -> list[str]:
+@tool
+def get_time_ranged_search_results(
+    start_ts: datetime.datetime, end_ts: datetime.datetime
+) -> NLSResult:
+    """
+    Returns search results between two Unix timestamps.
+
+    Parameters:
+    - start_ts (datetime.datetime): Start of the time range.
+    - end_ts (datetime.datetime): End of the time range.
+
+    Returns:
+    - NLSResult
+
+    Here's the definition of NLSResult:
+    @dataclass
+    class NLSResult:
+        result_type: str  # "answer" or "search"
+        # list of filenames for search results or sources for answers
+        files: list[str]
+        answer: str  # answer for question, empty string if result_type is "search"
+
+    Examples:
+    >>> # Files created in 2021
+    >>> get_time_ranged_search_results(
+    ...     datetime.datetime(2021, 1, 1),
+    ...     datetime.datetime(2021, 12, 31)
+    ... )
+    """
     resp = ES.search(
-        index=INDEX, query={"range": {"created": {"gte": start_ts, "lte": end_ts}}}
+        index=INDEX_NAME, query={"range": {"created": {"gte": start_ts, "lte": end_ts}}}
     )
 
     files: list[str] = []
@@ -71,29 +97,10 @@ def time_ranged_search(start_ts: float, end_ts: float) -> list[str]:
     return NLSResult(result_type="search", files=files, answer="")
 
 
-@tool
-def get_time_ranged_search_results(start_ts: float, end_ts: float) -> NLSResult:
-    """
-    Returns search results between two Unix timestamps.
-
-    Parameters:
-    - start_ts (float): Start of the time range (in seconds since epoch). Default is 0
-    - end_ts (float): End of the time range (in seconds since epoch).
-
-    Notes:
-    - Both `start_ts` and `end_ts` are required. Do not use the current timestamp as `end_ts` unless specified.
-    - For queries like "files created in 2021", compute `start_ts` as the beginning of 2021 and `end_ts` as the end of 2021.
-
-    Example:
-    - get_time_ranged_search_results(1609459200.0, 1640995199.0) for "files created in 2021".
-    """
-    return time_ranged_search(start_ts, end_ts)
-
-
 def semantic_search(query: str) -> NLSResult:
-    query_embedding = SBERT_MODEL.encode([query])[0]
+    query_embedding = SBertModel.get_embedding(query)
     resp = ES.search(
-        index=INDEX,
+        index=INDEX_NAME,
         query={
             "bool": {
                 "should": [
@@ -137,46 +144,41 @@ def get_semantic_search_results(query: str) -> NLSResult:
     return semantic_search(query)
 
 
-class SbertEmbedding(Embeddings):
-    """
-    Embedding function for SBERT model.
-    By creating a custom Embeddings class, we can reuse the same embedding function for the QA chain.
-    Otherwise, with HuggingFaceEmbeddings(), we would have to keep two copies of the embedding model in memory.
-
-    The following methods are required by the Embeddings class but we actually only care about `embed_query` .
-    """
-
-    def embed_query(self, query: str) -> list[float]:
-        return SBERT_MODEL.encode(query).tolist()
-
-    def embed_documents(self, documents: list[str]) -> list[list[float]]:
-        return [SBERT_MODEL.encode(doc).tolist() for doc in documents]
+def es_query(query: str):
+    # TODO: use KNN for QnA for now
+    query_embedding = SBertModel.get_embedding(query)
+    return {
+        "knn": {
+            "field": "embedding",
+            "query_vector": query_embedding,
+            "k": 1,
+            "num_candidates": 3,
+        },
+    }
 
 
 def answer_question(question: str) -> NLSResult:
     """
     Returns answers for a question about the file contents.
     """
-    # Setup ElasticsearchStore
-    es_store = ElasticsearchStore(
-        es_url="http://localhost:9200",
-        index_name=INDEX,
-        embedding=SbertEmbedding(),
-        strategy=DenseVectorScriptScoreStrategy(),
+
+    es_retriever = ElasticsearchRetriever.from_es_params(
+        url="http://localhost:9200",
+        index_name=INDEX_NAME,
+        content_field="text",
+        body_func=es_query,
     )
 
     # Setup llm to use
     load_dotenv()
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    llm = ChatOpenAI(temperature=0.1, api_key=openai_api_key)
+    llm = ChatOpenAI(temperature=0.1, api_key=openai_api_key, model="gpt-4o-mini")
 
     # Setup QA chain
     qa = RetrievalQA.from_chain_type(
         chain_type="stuff",  # -> fill up
         llm=llm,
-        retriever=es_store.as_retriever(
-            search_kwargs={"k": 1},  # Right now, we only keep one file as the source
-        ),
+        retriever=es_retriever,
         return_source_documents=True,
     )
 
@@ -187,16 +189,16 @@ def answer_question(question: str) -> NLSResult:
     files: list[str] = []
     for doc in resp["source_documents"]:
         # Add to cache
-        file_by_name[doc.metadata["filename"]] = File(
-            filename=doc.metadata["filename"],
-            created=doc.metadata["created"],
-            path=doc.metadata["path"],
-            size=doc.metadata["size"],
-            extension=doc.metadata["extension"],
+        file_by_name[doc.metadata["_source"]["filename"]] = File(
+            filename=doc.metadata["_source"]["filename"],
+            created=doc.metadata["_source"]["created"],
+            path=doc.metadata["_source"]["metadata"]["path"],
+            size=doc.metadata["_source"]["metadata"]["size"],
+            extension=doc.metadata["_source"]["metadata"]["extension"],
         )
 
         # Add to result
-        files.append(doc.metadata["filename"])
+        files.append(doc.metadata["_source"]["filename"])
 
     return NLSResult(result_type="answer", files=files, answer=answer)
 
@@ -212,14 +214,17 @@ def get_answers_for_question(question: str) -> NLSResult:
 SYSTEM_PROMPT = """You are a highly capable assistant designed to help with searching for files and answering questions about them. You have access to specialized tools for different types of queries. You always have to use at least one tool.
 
 1. For questions about file contents:
-   Use the question answering tool to provide information from the files. This is usually indicated by a ending question mark (?) in the query.
+   Use the question answering tool to provide information from the files. A query is considered a question if it:
+   - Ends with a question mark (?)
+   - Starts with question words (what, what's, how, why, when, where, who, which)
+   - Asks for instructions or explanations (e.g., "explain...", "tell me about...", "steps to...")
 
 2. For time-ranged queries (involving dates or times):
    Use the time-ranged search tool. Remember that the current Unix timestamp is {current_time}.
    Avoid performing time calculations yourself; use the provided tools for accuracy.
 
 3. For semantic queries (general search without time constraints):
-   Use the semantic search tool to find relevant files based on content or keywords. A semantic query does not contain a question mark (?) in the end. 
+   Use the semantic search tool to find relevant files based on content or keywords.
    Only use this tool if the query does not fit into any of the above categories.
 
 When responding:
@@ -230,6 +235,13 @@ When responding:
 - If unsure about any calculation or process, use the appropriate tool to achieve the desired outcome.
 - Return tool outputs to the user without modifications if they appear correct.
 
+Examples of questions (use question answering tool):
+- "how to setup a new python virtual env"
+- "steps to install docker"
+- "explain the deployment process"
+- "what are the requirements for this project"
+- "tell me about the database schema"
+
 Your goal is to route each query to the most suitable tool and provide accurate, helpful responses based on the tool's output.
 """
 
@@ -239,9 +251,9 @@ def natural_language_search(query: str) -> tuple[NLSResult, dict[str, File]]:
     Returns a tuple of (NLSResult, dict[str, File]).
     The File dict contians the mapping from filename to File object that are relevant to the result.
     """
+    # TODO: Figure out a better way to split the tools
     tools = [
         get_answers_for_question,  # to answer questions about the file contents
-        # TODO: Consider combining these two tools into a single tool that can perform both time-ranged and semantic search.
         get_time_ranged_search_results,  # to perform time-ranged search
         get_semantic_search_results,  # to perform semantic search
         PythonREPLTool(),  # to execute python code, for doing math
@@ -249,7 +261,7 @@ def natural_language_search(query: str) -> tuple[NLSResult, dict[str, File]]:
 
     load_dotenv()
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    llm = ChatOpenAI(temperature=0, api_key=openai_api_key)
+    llm = ChatOpenAI(temperature=0, api_key=openai_api_key, model="gpt-4o-mini")
     llm_with_tools = llm.bind(
         functions=[format_tool_to_openai_function(tool) for tool in tools]
     )
@@ -261,24 +273,13 @@ def natural_language_search(query: str) -> tuple[NLSResult, dict[str, File]]:
         ]
     )
 
-    agent = (
-        {
-            "input": lambda x: x["input"],
-            "agent_scratchpad": lambda x: format_to_openai_functions(
-                x["intermediate_steps"]
-            ),
-        }
-        | prompt
-        | llm_with_tools
-        | OpenAIFunctionsAgentOutputParser()
-    )
-
+    agent = create_openai_functions_agent(llm=llm, tools=tools, prompt=prompt)
     agent_executor = AgentExecutor(
         agent=agent,
         tools=tools,
-        verbose=True,
-        handle_parsing_errors=True,
+        handle_parsing_errors=True,  # Try to auto-correct the agent response is malformed
         return_intermediate_steps=True,
+        verbose=True,  # Display the agent's thought process
     )
 
     result = agent_executor.invoke({"input": query})
