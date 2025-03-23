@@ -271,6 +271,7 @@ def natural_language_search(query: str) -> tuple[NLSResult, dict[str, File]]:
         if search_result.result_type == "search":
             # Filter out the search result that the LLM chose to return in the final response
             # This helps perform file type filtering in the final response
+            # TODO: this is a hack, we should encode the filter type into the search tool.
             search_result.files = [
                 r for r in search_result.files if r in result["output"]
             ]
