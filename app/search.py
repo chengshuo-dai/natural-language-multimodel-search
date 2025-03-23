@@ -227,10 +227,11 @@ Your goal is to route each query to the most suitable tool and provide accurate,
 """
 
 
-def natural_language_search(query: str) -> tuple[NLSResult, dict[str, File]]:
+def natural_language_search(query: str) -> tuple[NLSResult, dict[str, File], list[str]]:
     """
-    Returns a tuple of (NLSResult, dict[str, File]).
+    Returns a tuple of (NLSResult, dict[str, File], list[str]).
     The File dict contians the mapping from filename to File object that are relevant to the result.
+    The list of strings is the list of tools that were used.
     """
     # TODO: Figure out a better way to split the tools
     tools = [
@@ -285,7 +286,9 @@ def natural_language_search(query: str) -> tuple[NLSResult, dict[str, File]]:
             if fname in search_result.files
         }
 
-        return search_result, file_metas
+        tools_used = [step[0].tool for step in result["intermediate_steps"]]
+
+        return search_result, file_metas, tools_used
     except Exception as e:
         rich.print(e)
         raise e

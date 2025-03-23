@@ -24,11 +24,11 @@ def _get_file_element(file_meta: File) -> Element:
 
 
 async def time_consuming_function(user_input: str) -> None:
-    result, file_metas = natural_language_search(user_input)
+    result, file_metas, tools_used = natural_language_search(user_input)
 
     if len(result.files) == 0 and result.result_type == "search":
         await cl.Message(content="No results found.").send()
-        return
+        return tools_used
 
     elements = [_get_file_element(file_metas[result]) for result in result.files]
 
@@ -51,6 +51,8 @@ async def time_consuming_function(user_input: str) -> None:
 
     await cl.Message(content=message_content, elements=elements).send()
 
+    return tools_used
+
 
 @cl.on_chat_start
 async def start():
@@ -60,8 +62,11 @@ async def start():
 @cl.on_message
 async def main(message: cl.Message):
     # Start a loading status indicator
-    async with cl.Step("Processing your query..."):
-        await time_consuming_function(message.content)
+    async with cl.Step("Processing your query...") as step:
+        tools_used = await time_consuming_function(message.content)
+
+    step.output = "Tools used:\n" + "\n".join([f"- `{tool}`" for tool in tools_used])
+    await step.update()
 
 
 if __name__ == "__main__":
