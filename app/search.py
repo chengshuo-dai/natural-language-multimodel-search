@@ -97,7 +97,11 @@ def get_time_ranged_search_results(
     return NLSResult(result_type="search", files=files, answer="")
 
 
-def semantic_search(query: str) -> NLSResult:
+@tool
+def get_semantic_search_results(query: str) -> NLSResult:
+    """
+    Returns search results based on semantic similarity to the query.
+    """
     query_embedding = SBertModel.get_embedding(query)
     resp = ES.search(
         index=INDEX_NAME,
@@ -134,16 +138,6 @@ def semantic_search(query: str) -> NLSResult:
     return NLSResult(result_type="search", files=files, answer="")
 
 
-@tool
-def get_semantic_search_results(query: str) -> NLSResult:
-    """
-    Returns search results for a semantic query that does not involve time ranges.
-    Example:
-    - get_semantic_search_results("christmas hat")
-    """
-    return semantic_search(query)
-
-
 def es_query(query: str):
     # TODO: use KNN for QnA for now
     query_embedding = SBertModel.get_embedding(query)
@@ -157,11 +151,11 @@ def es_query(query: str):
     }
 
 
-def answer_question(question: str) -> NLSResult:
+@tool
+def get_answers_for_question(question: str) -> NLSResult:
     """
-    Returns answers for a question about the file contents.
+    Returns answers for questions about file contents by analyzing the content semantically.
     """
-
     es_retriever = ElasticsearchRetriever.from_es_params(
         url="http://localhost:9200",
         index_name=INDEX_NAME,
@@ -172,7 +166,7 @@ def answer_question(question: str) -> NLSResult:
     # Setup llm to use
     load_dotenv()
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    llm = ChatOpenAI(temperature=0.1, api_key=openai_api_key, model="gpt-4o-mini")
+    llm = ChatOpenAI(temperature=0.1, api_key=openai_api_key, model="gpt-4o")
 
     # Setup QA chain
     qa = RetrievalQA.from_chain_type(
@@ -201,14 +195,6 @@ def answer_question(question: str) -> NLSResult:
         files.append(doc.metadata["_source"]["filename"])
 
     return NLSResult(result_type="answer", files=files, answer=answer)
-
-
-@tool
-def get_answers_for_question(question: str) -> NLSResult:
-    """
-    Returns answers for a question about the file contents.
-    """
-    return answer_question(question)
 
 
 SYSTEM_PROMPT = """You are a highly capable assistant designed to help with searching for files and answering questions about them. You have access to specialized tools for different types of queries. You always have to use at least one tool.
@@ -261,10 +247,7 @@ def natural_language_search(query: str) -> tuple[NLSResult, dict[str, File]]:
 
     load_dotenv()
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    llm = ChatOpenAI(temperature=0, api_key=openai_api_key, model="gpt-4o-mini")
-    llm_with_tools = llm.bind(
-        functions=[format_tool_to_openai_function(tool) for tool in tools]
-    )
+    llm = ChatOpenAI(temperature=0, api_key=openai_api_key, model="gpt-4o")
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", SYSTEM_PROMPT.format(current_time=int(time.time()))),
