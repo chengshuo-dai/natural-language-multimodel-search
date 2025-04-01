@@ -160,11 +160,11 @@ cython_debug/
 #.idea/
 
 # Chainlit hidden files
-app/.chainlit/
-app/.chainlit/**
+.chainlit/
+.chainlit/**
 
 # Other hidden files in app folder
-app/.*
+**/.*
 
 # Ignore .DS_Store files in all directories
 **/.DS_Store
