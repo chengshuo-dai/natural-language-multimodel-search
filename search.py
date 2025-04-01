@@ -16,7 +16,8 @@ from model.sbert import SBertModel
 
 elasticsearch_host = os.getenv("ELASTICSEARCH_HOST", "localhost")
 elasticsearch_port = os.getenv("ELASTICSEARCH_PORT", "9200")
-ES = Elasticsearch(f"http://{elasticsearch_host}:{elasticsearch_port}/")
+ES_URL = f"http://{elasticsearch_host}:{elasticsearch_port}/"
+ES = Elasticsearch(ES_URL)
 INDEX_NAME = "nls"
 
 
@@ -144,7 +145,7 @@ def get_answers_for_question(question: str) -> NLSResult:
     """
     # TODO: we're using KNN for QnA for now, expand this to better retrieval methods
     es_retriever = ElasticsearchRetriever.from_es_params(
-        url="http://localhost:9200",
+        url=ES_URL,
         index_name=INDEX_NAME,
         content_field="text",
         body_func=lambda query: {

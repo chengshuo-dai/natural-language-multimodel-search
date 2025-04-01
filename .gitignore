@@ -163,8 +163,5 @@ cython_debug/
 .chainlit/
 .chainlit/**
 
-# Other hidden files in app folder
-**/.*
-
 # Ignore .DS_Store files in all directories
 **/.DS_Store

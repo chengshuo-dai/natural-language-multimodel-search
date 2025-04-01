@@ -6,13 +6,14 @@ import warnings
 import pytesseract
 import rich
 import whisper
-from data.data import Document
 from elasticsearch import Elasticsearch
-from model.sbert import SBertModel
 from pdf2image import convert_from_path
 from PIL import Image
 from rich.progress import Progress
 from transformers import BlipForConditionalGeneration, BlipProcessor
+
+from data.data import Document
+from model.sbert import SBertModel
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 warnings.filterwarnings("ignore", category=FutureWarning)

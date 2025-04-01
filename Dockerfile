@@ -11,5 +11,6 @@ COPY . .
 ENV ELASTICSEARCH_HOST=elasticsearch
 ENV ELASTICSEARCH_PORT=9200
 
-# Update the CMD to use chainlit
-CMD ["chainlit", "run", "app.py", "--port", "8000"] 
+# Update the CMD to bind to all interfaces
+# so that it can be accessed from outside the container
+CMD ["chainlit", "run", "app.py", "--host", "0.0.0.0", "--port", "8000"] 
