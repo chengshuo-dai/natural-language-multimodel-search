@@ -110,7 +110,7 @@ def get_semantic_search_results(query: str) -> NLSResult:
             }
         },
         knn={
-            "field": "vector",
+            "field": "embedding",
             "query_vector": query_embedding,
             "k": 1,
             "num_candidates": 3,
