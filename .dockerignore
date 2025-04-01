@@ -7,3 +7,4 @@ __pycache__
 .chainlit/
 .chainlit/**
 **/.DS_Store
+.tar
