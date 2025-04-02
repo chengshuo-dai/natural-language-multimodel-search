@@ -31,8 +31,11 @@ BLIP_MODEL = BlipForConditionalGeneration.from_pretrained(
     "Salesforce/blip-image-captioning-base"
 )
 
-# Elasticsearch
-ES = Elasticsearch("http://localhost:9200/")
+elasticsearch_host = os.getenv("ELASTICSEARCH_HOST", "localhost")
+elasticsearch_port = os.getenv("ELASTICSEARCH_PORT", "9200")
+ES_URL = f"http://{elasticsearch_host}:{elasticsearch_port}/"
+ES = Elasticsearch(ES_URL)
+
 INDEX_NAME = "nls"
 INDEX_MAPPING = {
     "properties": {
