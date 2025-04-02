@@ -169,6 +169,6 @@ cython_debug/
 # Ignore docker tar files
 *.tar
 
-# Ingore deployment automation scripts for now
+# Ignore deployment automation scripts for now
 deploy_commands.sh
 deploy.sh
