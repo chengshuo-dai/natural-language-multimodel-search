@@ -34,7 +34,7 @@ docker run -d \
 
 # Run indexing process inside the nls-app container
 echo "Starting data indexing..."
-docker exec nls-app python processor/process_files.py sample_folder
+docker exec -e PYTHONPATH=/app nls-app python /app/processor/processor.py /app/sample_folder
 
 # Show container status
 docker ps 

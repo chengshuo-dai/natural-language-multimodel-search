@@ -20,6 +20,9 @@ RUN pip install --no-cache-dir -r requirements.txt \
 
 COPY . .
 
+# Make sure Python can find our modules
+ENV PYTHONPATH=/app
+
 # Make sure the app uses environment variables for ES connection
 ENV ELASTICSEARCH_HOST=elasticsearch
 ENV ELASTICSEARCH_PORT=9200
