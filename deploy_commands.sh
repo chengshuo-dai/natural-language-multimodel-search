@@ -1,37 +1,26 @@
 #!/bin/bash
 
-# Remove existing containers if they exist (suppress errors if they don't)
-if docker ps -a | grep -q elasticsearch; then
-    docker rm -f elasticsearch
-fi
-
-if docker ps -a | grep -q nls-app; then
-    docker rm -f nls-app
-fi
-
-# Load images
-echo "Loading images..."
-docker load < es-with-data.tar
-docker load < nls-app.tar
+# Use DOCKER_USERNAME from environment variable
+: "${DOCKER_USERNAME:=jdedward}"
 
 # Create network if it doesn't exist
 echo "Creating network..."
 docker network create elastic || true
 
-# Run Elasticsearch
+# Pull and run Elasticsearch
 echo "Starting Elasticsearch..."
 docker run -d \
     --name elasticsearch \
     --network elastic \
     --restart unless-stopped \
     -p 9200:9200 \
-    es-with-data:latest
+    docker.elastic.co/elasticsearch/elasticsearch:8.17.2
 
 # Wait for Elasticsearch to start
 echo "Waiting for Elasticsearch to start..."
 sleep 30
 
-# Run nls-app
+# Pull and run nls-app
 echo "Starting nls-app..."
 docker run -d \
     --name nls-app \
@@ -41,7 +30,11 @@ docker run -d \
     --env-file .env \
     -e ELASTICSEARCH_HOST=elasticsearch \
     -e ELASTICSEARCH_PORT=9200 \
-    nls-app:latest
+    $DOCKER_USERNAME/nls-app:latest
+
+# Run indexing process inside the nls-app container
+echo "Starting data indexing..."
+docker exec nls-app python processor/process_files.py sample_folder
 
 # Show container status
 docker ps 
