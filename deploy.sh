@@ -1,9 +1,6 @@
 #!/bin/bash
 
 # Configuration
-EC2_KEY="~/aws_keys/nls_deploy.pem"
-EC2_USER="ec2-user"
-EC2_IP="34.222.12.60"
 DOCKER_USERNAME="jdedward"  # Default username, can be overridden
 SKIP_BUILD=false  # Default to not skipping build
 
@@ -26,20 +23,8 @@ else
     echo "Skipping Docker build and push..."
 fi
 
-# Transfer configuration files
-echo "Transferring files to EC2..."
-scp -i $EC2_KEY \
-    .env \
-    deploy_commands.sh \
-    $EC2_USER@$EC2_IP:~/
-
-echo "Deployment files transferred!"
-
-# Execute commands on EC2
-echo "Deploying on EC2..."
-ssh -i $EC2_KEY $EC2_USER@$EC2_IP "DOCKER_USERNAME=$DOCKER_USERNAME bash -s" << 'EOF'
-chmod +x deploy_commands.sh
-./deploy_commands.sh
-EOF
+# Run deployment commands
+echo "Starting deployment..."
+DOCKER_USERNAME=$DOCKER_USERNAME ./deploy_commands.sh
 
 echo "Deployment complete!" 

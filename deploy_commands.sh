@@ -3,11 +3,11 @@
 # Use DOCKER_USERNAME from environment variable
 : "${DOCKER_USERNAME:=jdedward}"
 
-# Create network if it doesn't exist
-echo "Creating network..."
-docker network create elastic || true
+# Remove existing containers if they exist
+if docker ps -a | grep -q elasticsearch; then
+    docker rm -f elasticsearch
+fi
 
-# Pull and run Elasticsearch
 echo "Starting Elasticsearch..."
 docker run -d \
     --name elasticsearch \
