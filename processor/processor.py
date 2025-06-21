@@ -1,19 +1,19 @@
-import argparse
 import datetime
 import os
 import warnings
 
 import pytesseract
 import rich
-import whisper
+import typer
 from elasticsearch import Elasticsearch
 from pdf2image import convert_from_path
 from PIL import Image
 from rich.progress import Progress
-from transformers import BlipForConditionalGeneration, BlipProcessor
 
 from data.data import Document
+from model.blip_model import BlipModel
 from model.sbert import SBertModel
+from model.whisper_model import WhisperModel
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -23,35 +23,12 @@ warnings.filterwarnings("ignore", category=UserWarning)
 # Expand the list to include more extensions and update the process_file function as needed.
 VALID_FILE_EXTENSIONS = [".pdf", ".mp3", ".txt", ".png", ".jpg", ".jpeg"]
 
-
-WHISPER_MODEL = whisper.load_model("base")
-
-BLIP_PROCESSOR = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-BLIP_MODEL = BlipForConditionalGeneration.from_pretrained(
-    "Salesforce/blip-image-captioning-base"
-)
-
 elasticsearch_host = os.getenv("ELASTICSEARCH_HOST", "localhost")
 elasticsearch_port = os.getenv("ELASTICSEARCH_PORT", "9200")
 ES_URL = f"http://{elasticsearch_host}:{elasticsearch_port}/"
 ES = Elasticsearch(ES_URL)
 
 INDEX_NAME = "nls"
-INDEX_MAPPING = {
-    "properties": {
-        "filename": {"type": "text", "analyzer": "english"},
-        "extension": {"type": "text"},
-        "text": {"type": "text", "analyzer": "english"},
-        "created": {"type": "date"},
-        "embedding": {
-            "type": "dense_vector",
-            "dims": SBertModel.get_dimension(),
-            "index": True,  # required for similarity search
-            "similarity": "cosine",
-        },
-        "metadata": {"type": "object", "enabled": False},
-    }
-}
 
 
 def get_files_in_folder(folder_path: str) -> list[str]:
@@ -74,10 +51,7 @@ def process_file(file_path: str) -> bool:
     Process a single file. Returns True if the file was processed successfully, False otherwise.
     """
     if not file_path.lower().endswith(tuple(VALID_FILE_EXTENSIONS)):
-        rich.print(f"[yellow]Skipping file: {file_path}[/yellow]")
         return False
-
-    rich.print(f"[blue]Processing file: {file_path}[/blue]")
 
     # Get basic file metadata
     filename = os.path.basename(file_path)
@@ -90,17 +64,15 @@ def process_file(file_path: str) -> bool:
             text = f.read()
     elif extension in [".mp3"]:
         # Audio files
-        text = WHISPER_MODEL.transcribe(file_path)["text"]
+        text = WhisperModel.transcribe(file_path)["text"]
     elif extension in [".png", ".jpg", ".jpeg"]:
         # We get both the image description and the image caption, and concatenate them
         image = Image.open(file_path).convert("RGB")
 
-        # Get the image description
-        inputs = BLIP_PROCESSOR(image, return_tensors="pt")
-        out = BLIP_MODEL.generate(**inputs, max_new_tokens=400)
-        description = BLIP_PROCESSOR.decode(out[0], skip_special_tokens=True)
+        # Get the image description using BLIP
+        description = BlipModel.generate_caption(image)
 
-        # Get the image caption
+        # Get the image caption using OCR
         ocr_result = pytesseract.image_to_string(image)
         text = f"{description}\n{ocr_result}"
     elif extension in [".pdf"]:
@@ -137,6 +109,7 @@ def process_files(folder_path: str):
     """
     files = get_files_in_folder(folder_path)
     skipped = []
+    processed = []
 
     with Progress() as progress:
         task = progress.add_task("Processing files...", total=len(files))
@@ -145,35 +118,57 @@ def process_files(folder_path: str):
             success = process_file(file_path)
             if not success:
                 skipped.append(file_path)
+            else:
+                processed.append(file_path)
             progress.update(task, advance=1)
 
-    rich.print(f"[yellow]Skipped {len(skipped)} files.[/yellow]")
-    rich.print("[green bold]Done[/green bold]")
+    rich.print(f"[green bold]Processed {len(processed)} files.[/green bold]")
+    rich.print(f"[yellow bold]Skipped {len(skipped)} files.[/yellow bold]")
 
 
-if __name__ == "__main__":
-    # Add a argparser to handle the command line arguments
-    parser = argparse.ArgumentParser(description="Process a folder of files.")
-    parser.add_argument(
-        "--folder_path",
-        required=True,
-        type=str,
-        help="The path to the folder to process.",
-    )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite the index if it already exists.",
-    )
-    args = parser.parse_args()
+def get_index_mapping():
+    """
+    Get the index mapping with the correct embedding dimensions.
+    """
+    return {
+        "properties": {
+            "filename": {"type": "text", "analyzer": "english"},
+            "extension": {"type": "text"},
+            "text": {"type": "text", "analyzer": "english"},
+            "created": {"type": "date"},
+            "embedding": {
+                "type": "dense_vector",
+                "dims": SBertModel.get_dimension(),
+                "index": True,  # required for similarity search
+                "similarity": "cosine",
+            },
+            "metadata": {"type": "object", "enabled": False},
+        }
+    }
 
-    if args.overwrite:
+
+def main(
+    folder_path: str = typer.Option(
+        ..., "--folder_path", "-f", help="The path to the folder to process."
+    ),
+    overwrite: bool = typer.Option(
+        False, "--overwrite", "-o", help="Overwrite the index if it already exists."
+    ),
+):
+    """
+    Process a folder of files and index them in Elasticsearch.
+    """
+    if overwrite:
         rich.print("[red]Overwriting the index...[/red]")
         if ES.indices.exists(index=INDEX_NAME):
             ES.indices.delete(index=INDEX_NAME)
 
     # Create the index if it doesn't exist
     if not ES.indices.exists(index=INDEX_NAME):
-        ES.indices.create(index=INDEX_NAME, mappings=INDEX_MAPPING)
+        ES.indices.create(index=INDEX_NAME, mappings=get_index_mapping())
 
-    process_files(args.folder_path)
+    process_files(folder_path)
+
+
+if __name__ == "__main__":
+    typer.run(main)
