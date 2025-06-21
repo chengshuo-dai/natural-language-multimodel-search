@@ -1,10 +1,10 @@
-import argparse
 import datetime
 import os
 import warnings
 
 import pytesseract
 import rich
+import typer
 import whisper
 from elasticsearch import Elasticsearch
 from pdf2image import convert_from_path
@@ -151,23 +151,16 @@ def process_files(folder_path: str):
     rich.print("[green bold]Done[/green bold]")
 
 
-if __name__ == "__main__":
-    # Add a argparser to handle the command line arguments
-    parser = argparse.ArgumentParser(description="Process a folder of files.")
-    parser.add_argument(
-        "--folder_path",
-        required=True,
-        type=str,
-        help="The path to the folder to process.",
-    )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite the index if it already exists.",
-    )
-    args = parser.parse_args()
-
-    if args.overwrite:
+def main(
+    folder_path: str = typer.Argument(..., help="The path to the folder to process."),
+    overwrite: bool = typer.Option(
+        False, "--overwrite", "-o", help="Overwrite the index if it already exists."
+    ),
+):
+    """
+    Process a folder of files and index them in Elasticsearch.
+    """
+    if overwrite:
         rich.print("[red]Overwriting the index...[/red]")
         if ES.indices.exists(index=INDEX_NAME):
             ES.indices.delete(index=INDEX_NAME)
@@ -176,4 +169,8 @@ if __name__ == "__main__":
     if not ES.indices.exists(index=INDEX_NAME):
         ES.indices.create(index=INDEX_NAME, mappings=INDEX_MAPPING)
 
-    process_files(args.folder_path)
+    process_files(folder_path)
+
+
+if __name__ == "__main__":
+    typer.run(main)
