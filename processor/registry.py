@@ -1,9 +1,11 @@
-from model.base import Model
-from processor.handlers.audio_handler import AudioFileHandler
-from processor.handlers.base import FileHandler
-from processor.handlers.image_handler import ImageFileHandler
-from processor.handlers.pdf_handler import PDFFileHandler
-from processor.handlers.text_handler import TextFileHandler
+from model import Model
+from processor.handlers import (
+    AudioFileHandler,
+    FileHandler,
+    ImageFileHandler,
+    PDFFileHandler,
+    TextFileHandler,
+)
 
 
 class FileHandlerRegistry:

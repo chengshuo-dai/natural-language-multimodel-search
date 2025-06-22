@@ -9,7 +9,7 @@ from rich.progress import Progress
 
 from data.data import Document
 from model.sbert_model import SBertModel
-from processor.handlers.registry import FileHandlerRegistry
+from processor.registry import FileHandlerRegistry
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 warnings.filterwarnings("ignore", category=FutureWarning)
