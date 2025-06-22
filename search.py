@@ -12,7 +12,7 @@ from langchain_elasticsearch import ElasticsearchRetriever
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain_openai import ChatOpenAI
 
-from model.sbert import SBertModel
+from model.sbert_model import SBertModel
 
 elasticsearch_host = os.getenv("ELASTICSEARCH_HOST", "localhost")
 elasticsearch_port = os.getenv("ELASTICSEARCH_PORT", "9200")

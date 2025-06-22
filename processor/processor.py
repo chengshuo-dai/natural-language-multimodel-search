@@ -2,26 +2,18 @@ import datetime
 import os
 import warnings
 
-import pytesseract
 import rich
 import typer
 from elasticsearch import Elasticsearch
-from pdf2image import convert_from_path
-from PIL import Image
 from rich.progress import Progress
 
 from data.data import Document
-from model.blip_model import BlipModel
-from model.sbert import SBertModel
-from model.whisper_model import WhisperModel
+from model.sbert_model import SBertModel
+from processor.handlers.registry import FileHandlerRegistry
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
-
-# This is just for illustration purposes.
-# Expand the list to include more extensions and update the process_file function as needed.
-VALID_FILE_EXTENSIONS = [".pdf", ".mp3", ".txt", ".png", ".jpg", ".jpeg"]
 
 elasticsearch_host = os.getenv("ELASTICSEARCH_HOST", "localhost")
 elasticsearch_port = os.getenv("ELASTICSEARCH_PORT", "9200")
@@ -31,105 +23,95 @@ ES = Elasticsearch(ES_URL)
 INDEX_NAME = "nls"
 
 
-def get_files_in_folder(folder_path: str) -> list[str]:
-    """
-    Get a list of all files within the specified folder.
-    """
-    file_list = []
+def get_supported_files(folder_path: str) -> tuple[list[str], list[str]]:
+    """Get files that can be processed and files that will be skipped."""
+    supported_files = []
+    skipped_files = []
+
     for root, _, files in os.walk(folder_path):
         for file in files:
-            file_list.append(os.path.join(root, file))
-    return file_list
+            file_path = os.path.join(root, file)
+            extension = os.path.splitext(file)[1].lower()
+            if FileHandlerRegistry.can_handle(extension):
+                supported_files.append(file_path)
+            else:
+                skipped_files.append(file_path)
+
+    return supported_files, skipped_files
 
 
-def index_file(doc: Document):
+def index_file(doc: Document) -> None:
+    """Index a document in Elasticsearch."""
     ES.index(index=INDEX_NAME, body=doc.to_index_body())
 
 
-def process_file(file_path: str) -> bool:
-    """
-    Process a single file. Returns True if the file was processed successfully, False otherwise.
-    """
-    if not file_path.lower().endswith(tuple(VALID_FILE_EXTENSIONS)):
-        return False
-
-    # Get basic file metadata
-    filename = os.path.basename(file_path)
+def process_file(file_path: str) -> Document:
+    """Process a single file using the appropriate handler."""
     extension = os.path.splitext(file_path)[1].lower()
+    handler_class = FileHandlerRegistry.get_handler(extension)
 
-    text = ""
-    if extension in [".txt"]:
-        # Pure text files
-        with open(file_path, "r") as f:
-            text = f.read()
-    elif extension in [".mp3"]:
-        # Audio files
-        text = WhisperModel.transcribe(file_path)["text"]
-    elif extension in [".png", ".jpg", ".jpeg"]:
-        # We get both the image description and the image caption, and concatenate them
-        image = Image.open(file_path).convert("RGB")
+    if not handler_class:
+        raise ValueError(f"No handler found for extension: {extension}")
 
-        # Get the image description using BLIP
-        description = BlipModel.generate_caption(image)
-
-        # Get the image caption using OCR
-        ocr_result = pytesseract.image_to_string(image)
-        text = f"{description}\n{ocr_result}"
-    elif extension in [".pdf"]:
-        # PDF files
-        pages = convert_from_path(file_path)
-        pdf_page_texts = [
-            pytesseract.image_to_string(page.convert("RGB")) for page in pages
-        ]
-        text = "\n".join(pdf_page_texts)
-    else:
-        raise ValueError(f"Unsupported file extension: {extension}")
-
-    embedding = SBertModel.get_embedding(text)
-
-    doc = Document(
-        filename=filename,
-        text=text,
-        extension=extension,
-        created=datetime.datetime.fromtimestamp(os.path.getmtime(file_path)),
-        size=os.path.getsize(file_path),
-        path=file_path,
-        embedding=embedding,
-    )
-    index_file(doc)
-
-    ES.indices.refresh(index=INDEX_NAME)
-
-    return True
+    return handler_class.process_file(file_path)
 
 
-def process_files(folder_path: str):
-    """
-    Process all files in the specified folder using the given process function.
-    """
-    files = get_files_in_folder(folder_path)
-    skipped = []
+def process_files(folder_path: str) -> None:
+    """Process all supported files in the specified folder."""
+    # Get files we can process and files we'll skip
+    supported_files, skipped_files = get_supported_files(folder_path)
+
+    if not supported_files and not skipped_files:
+        rich.print("[yellow]No files found in the specified folder.[/yellow]")
+        return
+
+    if not supported_files:
+        rich.print("[yellow]No supported files found in the specified folder.[/yellow]")
+        if skipped_files:
+            rich.print(
+                f"[yellow]Found {len(skipped_files)} unsupported files.[/yellow]"
+            )
+        return
+
+    # Get extensions of files we'll process
+    extensions_to_process = {os.path.splitext(f)[1].lower() for f in supported_files}
+
+    # Load all required models upfront
+    rich.print("[yellow]Loading required models...[/yellow]")
+    FileHandlerRegistry.load_required_models(extensions_to_process)
+    rich.print("[green]All models loaded successfully![/green]\n")
+
+    # Process files with progress tracking
     processed = []
-
     with Progress() as progress:
-        task = progress.add_task("Processing files...", total=len(files))
+        task = progress.add_task("Processing files...", total=len(supported_files))
 
-        for file_path in files:
-            success = process_file(file_path)
-            if not success:
-                skipped.append(file_path)
-            else:
+        for file_path in supported_files:
+            filename = os.path.basename(file_path)
+            # Print status on a separate line
+            rich.print(f"[blue]Processing: {filename}[/blue]")
+
+            try:
+                doc = process_file(file_path)
+                index_file(doc)
                 processed.append(file_path)
+            except Exception as e:
+                rich.print(f"[red]Error processing {filename}: {e}[/red]")
+
             progress.update(task, advance=1)
 
+    # Refresh index once at the end
+    ES.indices.refresh(index=INDEX_NAME)
+
     rich.print(f"[green bold]Processed {len(processed)} files.[/green bold]")
-    rich.print(f"[yellow bold]Skipped {len(skipped)} files.[/yellow bold]")
+    if skipped_files:
+        rich.print(
+            f"[yellow bold]Skipped {len(skipped_files)} unsupported files.[/yellow bold]"
+        )
 
 
 def get_index_mapping():
-    """
-    Get the index mapping with the correct embedding dimensions.
-    """
+    """Get the index mapping with the correct embedding dimensions."""
     return {
         "properties": {
             "filename": {"type": "text", "analyzer": "english"},
@@ -139,7 +121,7 @@ def get_index_mapping():
             "embedding": {
                 "type": "dense_vector",
                 "dims": SBertModel.get_dimension(),
-                "index": True,  # required for similarity search
+                "index": True,
                 "similarity": "cosine",
             },
             "metadata": {"type": "object", "enabled": False},
@@ -155,9 +137,7 @@ def main(
         False, "--overwrite", "-o", help="Overwrite the index if it already exists."
     ),
 ):
-    """
-    Process a folder of files and index them in Elasticsearch.
-    """
+    """Process a folder of files and index them in Elasticsearch."""
     if overwrite:
         rich.print("[red]Overwriting the index...[/red]")
         if ES.indices.exists(index=INDEX_NAME):

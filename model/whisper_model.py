@@ -1,9 +1,9 @@
 import whisper
 
-from model.base_model import BaseModel
+from model.base import Model
 
 
-class WhisperModel(BaseModel):
+class WhisperModel(Model):
     """
     This WhisperModel can be used to transcribe audio files. It's a singleton class.
     """
