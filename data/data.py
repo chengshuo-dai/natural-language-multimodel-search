@@ -1,6 +1,5 @@
 import dataclasses
 from datetime import datetime
-from typing import Optional
 
 import numpy as np
 
@@ -13,7 +12,7 @@ class Document:
     created: datetime
     size: int
     path: str
-    embedding: Optional[np.ndarray] = None
+    embedding: np.ndarray | None = None
 
     def _get_metadata(self) -> dict:
         return {

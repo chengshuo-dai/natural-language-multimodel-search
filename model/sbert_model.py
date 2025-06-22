@@ -2,10 +2,10 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from transformers import AutoTokenizer
 
-from model.base_model import BaseModel
+from model.base import Model
 
 
-class SBertModel(BaseModel):
+class SBertModel(Model):
     """
     This SBertModel can be used to get the embedding of a text. It's a singleton class.
     """

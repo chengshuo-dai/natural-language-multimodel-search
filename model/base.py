@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from rich.console import Console
 
 
-class BaseModel(ABC):
+class Model(ABC):
     """
     Base class for lazy-loading models with animated loading indicators.
     Implements the singleton pattern with rich console status indicators.

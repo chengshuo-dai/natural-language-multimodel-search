@@ -1,10 +1,10 @@
 from PIL import Image
 from transformers import BlipForConditionalGeneration, BlipProcessor
 
-from model.base_model import BaseModel
+from model.base import Model
 
 
-class BlipModel(BaseModel):
+class BlipModel(Model):
     """
     This BlipModel can be used to generate image captions. It's a singleton class.
     """
