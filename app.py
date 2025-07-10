@@ -3,7 +3,8 @@ import datetime
 import chainlit as cl
 from chainlit.element import Element
 
-from search import File, natural_language_search
+from data.data import File
+from search import natural_language_search
 
 
 def _get_file_element(file_meta: File) -> Element:

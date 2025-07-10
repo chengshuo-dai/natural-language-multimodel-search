@@ -4,12 +4,15 @@ import warnings
 
 import rich
 import typer
+from dotenv import load_dotenv
 from elasticsearch import Elasticsearch
 from rich.progress import Progress
 
 from data.data import Document
 from model.sbert_model import SBertModel
 from processor.registry import FileHandlerRegistry
+
+load_dotenv()
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 warnings.filterwarnings("ignore", category=FutureWarning)
@@ -20,7 +23,7 @@ elasticsearch_port = os.getenv("ELASTICSEARCH_PORT", "9200")
 ES_URL = f"http://{elasticsearch_host}:{elasticsearch_port}/"
 ES = Elasticsearch(ES_URL)
 
-INDEX_NAME = "nls"
+INDEX_NAME = os.getenv("ELASTICSEARCH_INDEX_NAME", "nls")
 
 
 def get_supported_files(folder_path: str) -> tuple[list[str], list[str]]:

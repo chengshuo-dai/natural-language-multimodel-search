@@ -22,20 +22,40 @@ Use the processor to process a folder of files and index them in Elasticsearch: 
 
 ![Processor Run Screenshot](/app/resources/processor_run_screenshot.png)
 
-## Setup OpenAI API Key
+## Setup Environment Variables
 
-Create a `.env` file in the `app` directory with your OpenAI API key:   
+Create a `.env` file in the root directory with your configuration:   
 
 ```
-OPENAI_API_KEY=sk-...
+# OpenAI API Configuration
+OPENAI_API_KEY=sk-your-openai-api-key-here
+
+# Elasticsearch Configuration
+ELASTICSEARCH_HOST=localhost
+ELASTICSEARCH_PORT=9200
+ELASTICSEARCH_INDEX_NAME=nls
 ```
+
+You can copy the `.env.example` file and modify it with your actual values:
+
+```bash
+cp .env.example .env
+# Then edit .env with your actual API keys and configuration
+```
+
+### Environment Variables Explained:
+
+- **OPENAI_API_KEY**: Your OpenAI API key (required for question answering)
+- **ELASTICSEARCH_HOST**: Elasticsearch server hostname (default: localhost)
+- **ELASTICSEARCH_PORT**: Elasticsearch server port (default: 9200)
+- **ELASTICSEARCH_INDEX_NAME**: Name of the Elasticsearch index (default: nls)
 
 ## Launch Chainlit App (for development)
 
-Go to the `app` directory and launch the Chainlit app: 
+Launch the Chainlit app from the root directory: 
 
 ```bash
-cd app && chainlit run app.py -w
+chainlit run app.py -w
 ```
 
 The `-w` flag runs the app in watch mode, which allows you to edit the app and see the changes without restarting the app.
@@ -43,10 +63,10 @@ The `-w` flag runs the app in watch mode, which allows you to edit the app and s
 
 ## Launch Chainlit App (for production)
 
-Go to the `app` directory and launch the Chainlit app with `pm2`:
+Launch the Chainlit app with `pm2` from the root directory:
 
 ```bash
-cd app && pm2 start "chainlit run app.py --port 8000" --name chainlit
+pm2 start "chainlit run app.py --port 8000" --name chainlit
 ```
 
 This will start the Chainlit app on port 8000 and name the process `chainlit`.
@@ -73,7 +93,7 @@ This is helpful in case you run into any issues launching the app and stuck in a
 
 ## Expose Chainlit App to the internet
 
-If you do own a domain, you can expose the Chainlit app to the internet by adding a Caddyfile to the `app` directory with the following content:
+If you do own a domain, you can expose the Chainlit app to the internet by adding a Caddyfile to the root directory with the following content:
 
 ```
 your-domain.com {
