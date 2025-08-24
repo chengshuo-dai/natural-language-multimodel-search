@@ -5,6 +5,7 @@ from processor.handlers import (
     ImageFileHandler,
     PDFFileHandler,
     TextFileHandler,
+    VideoFileHandler,
 )
 
 
@@ -55,6 +56,7 @@ def register_all_handlers():
         ImageFileHandler,
         PDFFileHandler,
         AudioFileHandler,
+        VideoFileHandler,
     ]
 
     for handler in handlers:
