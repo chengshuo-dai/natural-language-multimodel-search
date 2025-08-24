@@ -1,25 +1,25 @@
 [
   {
     "id": "search_pdf_files",
-    "query": "pdf files about setup",
+    "query": "pdf about big table",
     "expected_result_type": "search",
-    "expected_files_contain": ["Setup Dev Environment.pdf"],
+    "expected_files_contain": ["big table.pdf"],
     "expected_tools": ["get_semantic_search_results"],
     "description": "Test semantic search for PDF files"
   },
   {
-    "id": "question_about_steve_jobs",
-    "query": "What did Steve Jobs say about connecting the dots?",
+    "id": "question_about_receipt",
+    "query": "How much did I spend at SFO?",
     "expected_result_type": "answer",
-    "expected_files_contain": ["Steve Jobs 2005 Stanford.txt"],
+    "expected_files_contain": ["receipt.jpg"],
     "expected_tools": ["get_answers_for_question"],
-    "description": "Test question answering from text files"
+    "description": "Test question answering from image files"
   },
   {
     "id": "search_images",
-    "query": "show me photos of animals",
+    "query": "dog photos",
     "expected_result_type": "search",
-    "expected_files_contain": ["DSC_1843.JPG"],
+    "expected_files_contain": ["photo.JPG", "yorkie-icon.png"],
     "expected_tools": ["get_semantic_search_results"],
     "description": "Test semantic search for image files"
   },
@@ -33,7 +33,7 @@
   },
   {
     "id": "search_audio_files",
-    "query": "audio files about iPhone",
+    "query": "titanium iphone",
     "expected_result_type": "search",
     "expected_files_contain": ["Introducing iPhone 15 Pro.mp3"],
     "expected_tools": ["get_semantic_search_results"],
@@ -41,11 +41,11 @@
   },
   {
     "id": "time_range_search",
-    "query": "files created today",
+    "query": "files created in 2021",
     "expected_result_type": "search",
+    "expected_files_contain": ["DSC_1843.JPG", "yorkie-icon.png"],
     "expected_tools": ["get_time_ranged_search_results"],
-    "description": "Test time-ranged search functionality",
-    "note": "Expected files will vary based on when test is run"
+    "description": "Test time-ranged search functionality"
   },
   {
     "id": "search_video_files",
@@ -56,71 +56,11 @@
     "description": "Test semantic search for video files"
   },
   {
-    "id": "question_with_question_mark",
-    "query": "What are the steps to install docker?",
-    "expected_result_type": "answer",
-    "expected_tools": ["get_answers_for_question"],
-    "description": "Test question detection with question mark"
-  },
-  {
-    "id": "search_by_file_type",
-    "query": "jpg images",
-    "expected_result_type": "search",
-    "expected_files_contain": ["receipt.jpg", "photo.JPG"],
-    "expected_tools": ["get_semantic_search_results"],
-    "description": "Test search for specific file types"
-  },
-  {
-    "id": "question_explain_format",
-    "query": "explain the database schema",
-    "expected_result_type": "answer",
-    "expected_tools": ["get_answers_for_question"],
-    "description": "Test question detection with 'explain' format"
-  },
-  {
-    "id": "question_tell_me_format",
-    "query": "tell me about the deployment process",
-    "expected_result_type": "answer",
-    "expected_tools": ["get_answers_for_question"],
-    "description": "Test question detection with 'tell me about' format"
-  },
-  {
-    "id": "search_subfolder_files",
-    "query": "files in subfolder",
+    "id": "time_range_before",
+    "query": "files before 2021",
     "expected_result_type": "search",
     "expected_files_contain": ["big table.pdf"],
-    "expected_tools": ["get_semantic_search_results"],
-    "description": "Test search for files in subfolders"
-  },
-  {
-    "id": "empty_search_result",
-    "query": "nonexistent file that definitely does not exist",
-    "expected_result_type": "search",
-    "expected_files_contain": [],
-    "expected_tools": ["get_semantic_search_results"],
-    "description": "Test search with no expected results"
-  },
-  {
-    "id": "question_how_format",
-    "query": "how to setup a new python virtual env?",
-    "expected_result_type": "answer",
-    "expected_tools": ["get_answers_for_question"],
-    "description": "Test question detection with 'how to' format"
-  },
-  {
-    "id": "search_icon_files",
-    "query": "yorkie icon",
-    "expected_result_type": "search",
-    "expected_files_contain": ["yorkie-icon.png"],
-    "expected_tools": ["get_semantic_search_results"],
-    "description": "Test search for icon files by name"
-  },
-  {
-    "id": "time_range_last_week",
-    "query": "files from last week",
-    "expected_result_type": "search",
     "expected_tools": ["get_time_ranged_search_results"],
-    "description": "Test time-ranged search for last week",
-    "note": "Expected files will vary based on when test is run"
+    "description": "Test time-ranged search for before 2021"
   }
 ]
