@@ -10,7 +10,13 @@ from rich.progress import Progress
 
 from data.data import Document
 from model.sbert_model import SBertModel
-from processor.registry import FileHandlerRegistry
+from processor.handlers import (
+    AudioFileHandler,
+    ImageFileHandler,
+    PDFFileHandler,
+    TextFileHandler,
+    VideoFileHandler,
+)
 
 load_dotenv()
 
@@ -25,6 +31,31 @@ ES = Elasticsearch(ES_URL)
 
 INDEX_NAME = os.getenv("ELASTICSEARCH_INDEX_NAME", "nls")
 
+# Build extension-to-handler mapping from handlers (single source of truth)
+EXTENSION_TO_HANDLER = {}
+for handler in [
+    TextFileHandler,
+    ImageFileHandler,
+    PDFFileHandler,
+    AudioFileHandler,
+    VideoFileHandler,
+]:
+    for ext in handler.get_supported_extensions():
+        EXTENSION_TO_HANDLER[ext] = handler
+
+
+def load_required_models(extensions: set[str]) -> None:
+    """Load all required models for the given extensions."""
+    required_models = set()
+    for extension in extensions:
+        handler_class = EXTENSION_TO_HANDLER.get(extension)
+        if handler_class:
+            required_models.update(handler_class.get_required_models())
+
+    # Load each model (they use singleton pattern, so this is safe)
+    for model_class in required_models:
+        model_class.get_instance()
+
 
 def get_supported_files(folder_path: str) -> tuple[list[str], list[str]]:
     """Get files that can be processed and files that will be skipped."""
@@ -35,7 +66,7 @@ def get_supported_files(folder_path: str) -> tuple[list[str], list[str]]:
         for file in files:
             file_path = os.path.join(root, file)
             extension = os.path.splitext(file)[1].lower()
-            if FileHandlerRegistry.can_handle(extension):
+            if extension in EXTENSION_TO_HANDLER:
                 supported_files.append(file_path)
             else:
                 skipped_files.append(file_path)
@@ -51,7 +82,7 @@ def index_file(doc: Document) -> None:
 def process_file(file_path: str) -> Document:
     """Process a single file using the appropriate handler."""
     extension = os.path.splitext(file_path)[1].lower()
-    handler_class = FileHandlerRegistry.get_handler(extension)
+    handler_class = EXTENSION_TO_HANDLER.get(extension)
 
     if not handler_class:
         raise ValueError(f"No handler found for extension: {extension}")
@@ -81,7 +112,7 @@ def process_files(folder_path: str) -> None:
 
     # Load all required models upfront
     rich.print("[yellow]Loading required models...[/yellow]")
-    FileHandlerRegistry.load_required_models(extensions_to_process)
+    load_required_models(extensions_to_process)
     rich.print("[green]All models loaded successfully![/green]\n")
 
     # Process files with progress tracking
