@@ -8,7 +8,7 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain_openai import ChatOpenAI
 
-from data.data import File, NLSResult
+from data.data import Document, NLSResult
 from services.es_service import ElasticsearchService
 from tools.search_tools import (
     get_answers_for_question,
@@ -61,12 +61,14 @@ Your goal is to route each query to the most suitable tool and provide accurate,
 """
 
 
-def natural_language_search(query: str) -> tuple[NLSResult, dict[str, File], list[str]]:
+def natural_language_search(
+    query: str,
+) -> tuple[NLSResult, dict[str, Document], list[str]]:
     """
     Perform natural language search using appropriate tools.
 
-    Returns a tuple of (NLSResult, dict[str, File], list[str]).
-    The File dict contains the mapping from filename to File object that are relevant to the result.
+    Returns a tuple of (NLSResult, dict[str, Document], list[str]).
+    The Document dict contains the mapping from filename to Document object that are relevant to the result.
     The list of strings is the list of tools that were used.
     """
     tools = [

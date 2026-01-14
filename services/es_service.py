@@ -1,6 +1,6 @@
 from elasticsearch import Elasticsearch
 
-from data.data import Document, File
+from data.data import Document
 from model.sbert_model import SBertModel
 
 
@@ -20,7 +20,7 @@ class ElasticsearchService:
         self.url = f"http://{host}:{port}/"
         self.client = Elasticsearch(self.url)
         self.index_name = index_name
-        self.file_cache: dict[str, File] = {}
+        self.file_cache: dict[str, Document] = {}
 
     @staticmethod
     def get_index_mapping() -> dict:
@@ -31,13 +31,14 @@ class ElasticsearchService:
                 "extension": {"type": "text"},
                 "text": {"type": "text", "analyzer": "english"},
                 "created": {"type": "date"},
+                "path": {"type": "text"},
+                "size": {"type": "long"},
                 "embedding": {
                     "type": "dense_vector",
                     "dims": SBertModel.get_dimension(),
                     "index": True,
                     "similarity": "cosine",
                 },
-                "metadata": {"type": "object", "enabled": False},
             }
         }
 
@@ -58,26 +59,36 @@ class ElasticsearchService:
 
     def index_document(self, doc: Document) -> None:
         """Index a document."""
-        self.client.index(index=self.index_name, body=doc.to_index_body())
+        self.client.index(index=self.index_name, body=doc.to_es_dict())
 
     def _process_search_results(self, response: dict) -> list[str]:
-        """Extract filenames and build File objects from search response."""
+        """Extract filenames and build Document objects from search response."""
         files = []
         for hit in response["hits"]["hits"]:
             source = hit["_source"]
             filename = source["filename"]
-            self.file_cache[filename] = File.from_elasticsearch_source(source)
+            self.file_cache[filename] = Document.from_es_dict(source)
             files.append(filename)
         return files
 
-    def get_file_metadata(self, filenames: list[str]) -> dict[str, File]:
-        """Get File objects for the given filenames from the cache."""
+    def get_file_metadata(self, filenames: list[str]) -> dict[str, Document]:
+        """Get Document objects for the given filenames from the cache."""
         return {
             fname: self.file_cache[fname]
             for fname in filenames
             if fname in self.file_cache
         }
 
-    def add_file_to_cache(self, filename: str, file_obj: File) -> None:
+    def add_file_to_cache(self, filename: str, file_obj: Document) -> None:
         """Add a file to the cache."""
         self.file_cache[filename] = file_obj
+
+    def search(self, query: dict, knn: dict | None = None) -> dict:
+        """Search the index with the given query and optional KNN parameters."""
+        search_params = {
+            "index": self.index_name,
+            "query": query,
+        }
+        if knn is not None:
+            search_params["knn"] = knn
+        return self.client.search(**search_params)

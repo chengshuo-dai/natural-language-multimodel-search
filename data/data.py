@@ -1,66 +1,47 @@
 import dataclasses
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 import numpy as np
 
 
 @dataclass
-class File:
-    filename: str
-    created: float
-    path: str
-    size: int
-    extension: str
-
-    @classmethod
-    def from_elasticsearch_source(cls, source: dict) -> "File":
-        """Create a File object from Elasticsearch response source data."""
-        return cls(
-            filename=source["filename"],
-            created=source["created"],
-            path=source["metadata"]["path"],
-            size=source["metadata"]["size"],
-            extension=source["metadata"]["extension"],
-        )
-
-
-@dataclass
 class Document:
     filename: str
-    text: str
     extension: str
     created: datetime
     size: int
     path: str
+    text: str
     embedding: np.ndarray
 
-    def _get_metadata(self) -> dict:
-        return {
-            "filename": self.filename,
-            "extension": self.extension,
-            "created": self.created,
-            "size": self.size,
-            "path": self.path,
-        }
+    @classmethod
+    def from_es_dict(cls, source: dict[str, Any]) -> "Document":
+        """Create a Document object from Elasticsearch response source data."""
+        return cls(
+            filename=source["filename"],
+            extension=source["extension"],
+            created=datetime.fromisoformat(source["created"].replace("Z", "+00:00")),
+            path=source["path"],
+            size=source["size"],
+            text=source["text"],
+            embedding=np.array(source["embedding"]),
+        )
 
-    def to_index_body(self) -> dict:
-        return {
-            "filename": self.filename,
-            "extension": self.extension,
-            "text": self.text,
-            "created": self.created,
-            "embedding": self.embedding.tolist(),
-            "metadata": self._get_metadata(),
-        }
+    def to_es_dict(self) -> dict[str, Any]:
+        """Convert Document to Elasticsearch index dict."""
+        body = dataclasses.asdict(self)
+        body["embedding"] = self.embedding.tolist()
+        return body
 
 
 @dataclass
 class NLSResult:
     result_type: str  # "answer" or "search"
     # list of filenames for search results or sources for answers
-    # NOTE: we don't use list[File] because we want to keep the result type simple enough as the output of tools
+    # NOTE: we don't use list[Document] because we want to keep the result type simple enough as the output of tools
     # so that it's easier for LLM to parse
-    # we keep a mapping from filename to File object separately.
+    # we keep a mapping from filename to Document object separately.
     files: list[str]
     answer: str  # answer for question, empty string if result_type is "search"
