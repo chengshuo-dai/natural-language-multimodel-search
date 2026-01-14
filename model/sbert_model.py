@@ -21,13 +21,16 @@ class SBertModel(Model):
         }
 
     @classmethod
-    def get_embedding(cls, text: str, token_limit=512) -> np.ndarray:
-        # TODO: Implement the token limit
-        instance = cls.get_instance()
-        return instance["model"].encode(text)
+    def get_embedding(cls, text: str, token_limit: int = 500) -> np.ndarray:
+        """
+        TODO: Respect token limit by splitting the text into chunks,
+        embedding each chunk and then taking the average of the embeddings.
+        """
+        model = cls.get_instance()["model"]
+        assert token_limit <= 512, "Token limit must be less than 512 for SBERT model."
+        return model.encode(text, normalize_embeddings=True)
 
     @classmethod
-    def get_dimension(cls):
-        instance = cls.get_instance()
-        model = instance["model"]
-        return model.encode("random").shape[0]
+    def get_dimension(cls) -> int:
+        model = cls.get_instance()["model"]
+        return model.encode("random text").shape[0]

@@ -9,7 +9,7 @@ from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain_openai import ChatOpenAI
 
 from data.data import File, NLSResult
-from services.elasticsearch_service import ElasticsearchService
+from services.es_service import ElasticsearchService
 from tools.search_tools import (
     get_answers_for_question,
     get_semantic_search_results,
