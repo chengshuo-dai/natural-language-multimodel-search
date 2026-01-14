@@ -33,7 +33,7 @@ class Document:
     created: datetime
     size: int
     path: str
-    embedding: np.ndarray | None = None
+    embedding: np.ndarray
 
     def _get_metadata(self) -> dict:
         return {
@@ -45,9 +45,6 @@ class Document:
         }
 
     def to_index_body(self) -> dict:
-        if self.embedding is None:
-            raise ValueError("Embedding is not set yet.")
-
         return {
             "filename": self.filename,
             "extension": self.extension,

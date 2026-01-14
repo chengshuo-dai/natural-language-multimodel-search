@@ -1,3 +1,3 @@
-from .elasticsearch_service import ElasticsearchService
+from .es_service import ElasticsearchService
 
 __all__ = ["ElasticsearchService"]
