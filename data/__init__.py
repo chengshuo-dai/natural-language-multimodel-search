@@ -1,3 +1,3 @@
-from .data import Document, File, NLSResult
+from .data import Document, NLSResult
 
-__all__ = ["Document", "File", "NLSResult"]
+__all__ = ["Document", "NLSResult"]

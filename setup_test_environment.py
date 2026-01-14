@@ -216,7 +216,7 @@ def run_indexing(
             sys.executable,
             "-m",
             "processor.processor",
-            "--folder_path",
+            "--folder-path",
             folder_path,
         ]
 

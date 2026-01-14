@@ -3,11 +3,11 @@ import datetime
 import chainlit as cl
 from chainlit.element import Element
 
-from data.data import File
+from data.data import Document
 from search import natural_language_search
 
 
-def _get_file_element(file_meta: File) -> Element:
+def _get_file_element(file_meta: Document) -> Element:
     element_cls_by_ext = {
         ".pdf": cl.Pdf,
         ".txt": cl.Text,
@@ -15,6 +15,7 @@ def _get_file_element(file_meta: File) -> Element:
         ".jpg": cl.Image,
         ".jpeg": cl.Image,
         ".png": cl.Image,
+        ".mp4": cl.Video,
     }
 
     element_cls = element_cls_by_ext.get(file_meta.extension)
@@ -53,9 +54,13 @@ async def main(message: cl.Message):
         for file in result.files:
             file_meta = file_metas[file]
             size_mb = f"{file_meta.size / (1024 * 1024):.2f} MB"
-            created_dt = datetime.datetime.fromisoformat(file_meta.created).strftime(
-                "%Y-%m-%d %H:%M"
-            )
+            # Handle created field - it might be datetime or string
+            if isinstance(file_meta.created, str):
+                created_dt = datetime.datetime.fromisoformat(
+                    file_meta.created
+                ).strftime("%Y-%m-%d %H:%M")
+            else:
+                created_dt = file_meta.created.strftime("%Y-%m-%d %H:%M")
             message_content += f"| {file_meta.filename} | {size_mb} | {created_dt} |\n"
 
         await cl.Message(content=message_content, elements=elements).send()

@@ -7,7 +7,7 @@ from langchain.tools import tool
 from langchain_elasticsearch import ElasticsearchRetriever
 from langchain_openai import ChatOpenAI
 
-from data.data import File, NLSResult
+from data.data import Document, NLSResult
 from model.sbert_model import SBertModel
 from services.es_service import ElasticsearchService
 
@@ -50,8 +50,7 @@ def get_time_ranged_search_results(
     ...     datetime.datetime(2021, 12, 31)
     ... )
     """
-    resp = es_service.client.search(
-        index=es_service.index_name,
+    resp = es_service.search(
         query={"range": {"created": {"gte": start_ts, "lte": end_ts}}},
     )
 
@@ -66,8 +65,7 @@ def get_semantic_search_results(query: str) -> NLSResult:
     Returns search results based on semantic similarity to the query.
     """
     query_embedding = SBertModel.get_embedding(query)
-    resp = es_service.client.search(
-        index=es_service.index_name,
+    resp = es_service.search(
         query={
             "bool": {
                 "should": [
@@ -106,6 +104,8 @@ def get_answers_for_question(question: str) -> NLSResult:
                 "k": 1,
                 "num_candidates": 3,
             },
+            # Explicitly request all source fields to ensure we get complete documents
+            "_source": True,
         },
     )
 
@@ -127,11 +127,14 @@ def get_answers_for_question(question: str) -> NLSResult:
     answer = resp["result"]
     files: list[str] = []
     for doc in resp["source_documents"]:
-        source = doc.metadata["_source"]
+        # LangChain's ElasticsearchRetriever puts the content_field ("text") in page_content
+        # and other fields in metadata["_source"]
+        source = {**doc.metadata.get("_source", {}), "text": doc.page_content}
+
         filename = source["filename"]
 
         # Add to cache
-        es_service.add_file_to_cache(filename, File.from_elasticsearch_source(source))
+        es_service.add_file_to_cache(filename, Document.from_es_dict(source))
 
         # Add to result
         files.append(filename)
