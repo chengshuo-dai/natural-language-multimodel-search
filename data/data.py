@@ -10,7 +10,7 @@ import numpy as np
 class Document:
     filename: str
     extension: str
-    created: datetime
+    created_at: datetime
     size: int
     path: str
     text: str
@@ -22,9 +22,11 @@ class Document:
         return cls(
             filename=source["filename"],
             extension=source["extension"],
-            created=datetime.fromisoformat(source["created"].replace("Z", "+00:00")),
-            path=source["path"],
+            created_at=datetime.fromisoformat(
+                source["created_at"].replace("Z", "+00:00")
+            ),
             size=source["size"],
+            path=source["path"],
             text=source["text"],
             embedding=np.array(source["embedding"]),
         )

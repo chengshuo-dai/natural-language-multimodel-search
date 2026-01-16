@@ -55,12 +55,12 @@ async def main(message: cl.Message):
             file_meta = file_metas[file]
             size_mb = f"{file_meta.size / (1024 * 1024):.2f} MB"
             # Handle created field - it might be datetime or string
-            if isinstance(file_meta.created, str):
+            if isinstance(file_meta.created_at, str):
                 created_dt = datetime.datetime.fromisoformat(
-                    file_meta.created
+                    file_meta.created_at
                 ).strftime("%Y-%m-%d %H:%M")
             else:
-                created_dt = file_meta.created.strftime("%Y-%m-%d %H:%M")
+                created_dt = file_meta.created_at.strftime("%Y-%m-%d %H:%M")
             message_content += f"| {file_meta.filename} | {size_mb} | {created_dt} |\n"
 
         await cl.Message(content=message_content, elements=elements).send()

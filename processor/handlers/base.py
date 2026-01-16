@@ -46,7 +46,7 @@ class FileHandler(ABC):
             filename=filename,
             text=text,
             extension=extension,
-            created=datetime.datetime.fromtimestamp(os.path.getmtime(file_path)),
+            created_at=datetime.datetime.fromtimestamp(os.path.getmtime(file_path)),
             size=os.path.getsize(file_path),
             path=file_path,
             embedding=embedding,

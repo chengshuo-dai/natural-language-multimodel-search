@@ -30,7 +30,7 @@ class ElasticsearchService:
                 "filename": {"type": "text", "analyzer": "english"},
                 "extension": {"type": "text"},
                 "text": {"type": "text", "analyzer": "english"},
-                "created": {"type": "date"},
+                "created_at": {"type": "date"},
                 "path": {"type": "text"},
                 "size": {"type": "long"},
                 "embedding": {
