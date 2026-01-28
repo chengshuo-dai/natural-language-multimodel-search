@@ -109,25 +109,7 @@ def check_test_index(index_name: str, folder_path: str) -> bool:
         # Get supported files in folder
         sys.path.insert(0, os.getcwd())  # Add current directory to path
         try:
-            from handlers import (
-                AudioFileHandler,
-                ImageFileHandler,
-                PDFFileHandler,
-                TextFileHandler,
-                VideoFileHandler,
-            )
-
-            # Build extension-to-handler mapping from handlers (same as processor.py)
-            extension_to_handler = {}
-            for handler in [
-                TextFileHandler,
-                ImageFileHandler,
-                PDFFileHandler,
-                AudioFileHandler,
-                VideoFileHandler,
-            ]:
-                for ext in handler.get_supported_extensions():
-                    extension_to_handler[ext] = handler
+            from handlers import EXTENSION_TO_HANDLER as extension_to_handler
         except ImportError:
             rich.print(
                 "[yellow]⚠️  Could not import handlers, assuming all common files are supported[/yellow]"

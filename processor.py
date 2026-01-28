@@ -3,42 +3,15 @@ import warnings
 
 import rich
 import typer
-from dotenv import load_dotenv
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 
 from data.data import Document
-from handlers import (
-    AudioFileHandler,
-    ImageFileHandler,
-    PDFFileHandler,
-    TextFileHandler,
-    VideoFileHandler,
-)
-from services.es_service import ElasticsearchService
-
-load_dotenv()
+from handlers import EXTENSION_TO_HANDLER
+from services import es_service
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
-
-es_service = ElasticsearchService.get_instance(
-    host=os.getenv("ELASTICSEARCH_HOST", "localhost"),
-    port=os.getenv("ELASTICSEARCH_PORT", "9200"),
-    index_name=os.getenv("ELASTICSEARCH_INDEX_NAME", "nls"),
-)
-
-# Build extension-to-handler mapping from handlers (single source of truth)
-EXTENSION_TO_HANDLER = {}
-for handler in [
-    TextFileHandler,
-    ImageFileHandler,
-    PDFFileHandler,
-    AudioFileHandler,
-    VideoFileHandler,
-]:
-    for ext in handler.get_supported_extensions():
-        EXTENSION_TO_HANDLER[ext] = handler
 
 
 def get_supported_files(folder_path: str) -> tuple[list[str], list[str]]:

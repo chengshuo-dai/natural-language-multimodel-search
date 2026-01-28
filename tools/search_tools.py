@@ -9,16 +9,10 @@ from langchain_openai import ChatOpenAI
 
 from data.data import Document, NLSResult
 from model.sbert_model import SBertModel
-from services.es_service import ElasticsearchService
+from services import es_service
 
-# Initialize the Elasticsearch service
+# Load environment variables
 load_dotenv()
-
-es_service = ElasticsearchService.get_instance(
-    host=os.getenv("ELASTICSEARCH_HOST", "localhost"),
-    port=os.getenv("ELASTICSEARCH_PORT", "9200"),
-    index_name=os.getenv("ELASTICSEARCH_INDEX_NAME", "nls"),
-)
 
 
 @tool

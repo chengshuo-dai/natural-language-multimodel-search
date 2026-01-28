@@ -9,7 +9,7 @@ from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain_openai import ChatOpenAI
 
 from data.data import Document, NLSResult
-from services.es_service import ElasticsearchService
+from services import es_service
 from tools.search_tools import (
     get_answers_for_question,
     get_semantic_search_results,
@@ -18,13 +18,6 @@ from tools.search_tools import (
 
 # Configuration - load from environment variables
 load_dotenv()  # Load environment variables early
-
-# Initialize services
-es_service = ElasticsearchService.get_instance(
-    host=os.getenv("ELASTICSEARCH_HOST", "localhost"),
-    port=os.getenv("ELASTICSEARCH_PORT", "9200"),
-    index_name=os.getenv("ELASTICSEARCH_INDEX_NAME", "nls"),
-)
 
 SYSTEM_PROMPT = """You are a highly capable assistant designed to help with searching for files and answering questions about them. You have access to specialized tools for different types of queries. You always have to use at least one tool.
 
