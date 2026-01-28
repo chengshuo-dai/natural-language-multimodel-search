@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 
 from data.data import Document
-from processor.handlers import (
+from handlers import (
     AudioFileHandler,
     ImageFileHandler,
     PDFFileHandler,

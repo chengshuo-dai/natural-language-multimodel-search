@@ -1,5 +1,5 @@
+from handlers.base import FileHandler
 from model.whisper_model import WhisperModel
-from processor.handlers.base import FileHandler
 
 
 class AudioFileHandler(FileHandler):

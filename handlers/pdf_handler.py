@@ -1,7 +1,7 @@
 import pytesseract
 from pdf2image import convert_from_path
 
-from processor.handlers.base import FileHandler
+from handlers.base import FileHandler
 
 
 class PDFFileHandler(FileHandler):

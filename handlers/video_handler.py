@@ -1,5 +1,5 @@
+from handlers.base import FileHandler
 from model.video_model import VideoModel
-from processor.handlers.base import FileHandler
 
 
 class VideoFileHandler(FileHandler):

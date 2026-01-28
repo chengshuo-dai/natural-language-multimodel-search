@@ -109,7 +109,7 @@ def check_test_index(index_name: str, folder_path: str) -> bool:
         # Get supported files in folder
         sys.path.insert(0, os.getcwd())  # Add current directory to path
         try:
-            from processor.handlers import (
+            from handlers import (
                 AudioFileHandler,
                 ImageFileHandler,
                 PDFFileHandler,

@@ -1,8 +1,8 @@
 import pytesseract
 from PIL import Image
 
+from handlers.base import FileHandler
 from model.blip_model import BlipModel
-from processor.handlers.base import FileHandler
 
 
 class ImageFileHandler(FileHandler):
