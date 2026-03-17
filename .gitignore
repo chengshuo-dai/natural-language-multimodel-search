@@ -175,3 +175,6 @@ deploy.sh
 
 # Chainlit cache files
 .files
+
+# Claude Code directory
+.claude/
