@@ -7,6 +7,10 @@ This is a simple app that allows you to search for files using natural language.
 
 Here is a demo video: https://capture.dropbox.com/vCuBkYtP40yWUXc9
 
+And the system structure:
+![Processor](https://github.com/chengshuo-dai/natural-language-multimodel-search/blob/main/processor.png)
+![server](https://github.com/chengshuo-dai/natural-language-multimodel-search/blob/main/server.png)
+
 ## Virtual Environment
 
 Install necessary packages: 
@@ -19,8 +23,6 @@ The `requirements.txt` file is generated with `pipreqs`. This requirement file i
 
 ## Index Setup
 Use the processor to process a folder of files and index them in Elasticsearch: `python processor/processor.py`. You only need to run this once.
-
-![Processor Run Screenshot](/app/resources/processor_run_screenshot.png)
 
 ## Setup Environment Variables
 
