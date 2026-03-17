@@ -9,7 +9,7 @@ Here is a demo video: https://capture.dropbox.com/vCuBkYtP40yWUXc9
 
 And the system structure:
 ![Processor](https://github.com/chengshuo-dai/natural-language-multimodel-search/blob/main/processor.png)
-![server](https://github.com/chengshuo-dai/natural-language-multimodel-search/blob/main/server.png)
+![serving](https://github.com/chengshuo-dai/natural-language-multimodel-search/blob/main/serving.png)
 
 ## Virtual Environment
 
